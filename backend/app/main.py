@@ -5,17 +5,21 @@ Import and call `create_app()` to get the configured ASGI application.
 `app` at module level is what uvicorn/gunicorn targets.
 """
 
-import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
+from app.api.v1.auth import router as auth_router
+from app.api.v1.health import router as health_router
+from app.api.v1.webhooks import router as webhooks_router
+from app.auth.dependencies import get_token_verifier
+from app.auth.middleware import TenantContextMiddleware
 from app.config import get_settings
 from app.core.logging import configure_logging
+from app.modules.organizations.router import router as organizations_router
 
 logger = structlog.get_logger(__name__)
 
@@ -56,10 +60,24 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Routers ─────────────────────────────────────────────────────────────
-    from app.api.v1.health import router as health_router
+    # ── Tenant Context & Auth Middleware (§L.3, Phase 3) ───────────────────
+    application.add_middleware(
+        TenantContextMiddleware,
+        verifier=get_token_verifier(),
+    )
 
+    # ── Routers ─────────────────────────────────────────────────────────────
+    # Top-level health
     application.include_router(health_router)
+
+    # Core Phase 3 routes (mounted at /api/v1 and top-level)
+    application.include_router(auth_router, prefix="/api/v1")
+    application.include_router(organizations_router, prefix="/api/v1")
+    application.include_router(webhooks_router, prefix="/api/v1")
+
+    # Convenience aliases for root paths
+    application.include_router(auth_router)
+    application.include_router(organizations_router)
 
     return application
 

@@ -20,3 +20,14 @@ const apiBaseUrl =
 // ponytail: typed as `any` until generated.ts exists; tightened in Phase 5.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const apiClient = createClient<any>({ baseUrl: apiBaseUrl });
+
+/**
+ * Returns an openapi-fetch client with Bearer auth token attached.
+ */
+export function createAuthenticatedClient(token?: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return createClient<any>({
+    baseUrl: apiBaseUrl,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}

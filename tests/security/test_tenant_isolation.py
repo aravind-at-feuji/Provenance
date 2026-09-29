@@ -28,6 +28,7 @@ from tests.conftest import make_company, make_edge, make_org
 # Helper — set RLS context
 # ---------------------------------------------------------------------------
 
+
 def _set_org(session, org_id: uuid.UUID) -> None:
     """Set the tenant context that RLS policies read."""
     session.execute(
@@ -44,6 +45,7 @@ def _enable_rls(session) -> None:
 # 1–5. RLS isolation: tenant A cannot read tenant B's rows
 # ---------------------------------------------------------------------------
 
+
 class TestSupplierRelationshipsRLS:
     def test_tenant_a_cannot_read_tenant_b_edges(self, db_session):
         """
@@ -56,11 +58,19 @@ class TestSupplierRelationshipsRLS:
         org_a = make_org(db_session, slug="org-alpha", company_id=co_a)
         org_b = make_org(db_session, slug="org-beta", company_id=co_b)
 
-        supplier_a = make_company(db_session, name_norm="supplier alpha cn", country="CN")
-        supplier_b = make_company(db_session, name_norm="supplier beta de", country="DE")
+        supplier_a = make_company(
+            db_session, name_norm="supplier alpha cn", country="CN"
+        )
+        supplier_b = make_company(
+            db_session, name_norm="supplier beta de", country="DE"
+        )
 
-        edge_a = make_edge(db_session, org_id=org_a, from_company_id=supplier_a, to_org_id=org_a)
-        edge_b = make_edge(db_session, org_id=org_b, from_company_id=supplier_b, to_org_id=org_b)
+        edge_a = make_edge(
+            db_session, org_id=org_a, from_company_id=supplier_a, to_org_id=org_a
+        )
+        edge_b = make_edge(
+            db_session, org_id=org_b, from_company_id=supplier_b, to_org_id=org_b
+        )
         db_session.flush()
 
         # Switch to RLS-on mode and authenticate as Tenant A
@@ -73,7 +83,9 @@ class TestSupplierRelationshipsRLS:
         visible_ids = {r[0] for r in rows}
 
         assert edge_a in visible_ids, "Tenant A's own edge must be visible"
-        assert edge_b not in visible_ids, "Tenant B's edge must NOT be visible to Tenant A"
+        assert (
+            edge_b not in visible_ids
+        ), "Tenant B's edge must NOT be visible to Tenant A"
 
     def test_tenant_b_cannot_read_tenant_a_edges(self, db_session):
         co_a = make_company(db_session, name_norm="co gamma")
@@ -82,7 +94,9 @@ class TestSupplierRelationshipsRLS:
         org_b = make_org(db_session, slug="org-delta", company_id=co_b)
 
         supplier_a = make_company(db_session, name_norm="supplier gamma", country="JP")
-        edge_a = make_edge(db_session, org_id=org_a, from_company_id=supplier_a, to_org_id=org_a)
+        edge_a = make_edge(
+            db_session, org_id=org_a, from_company_id=supplier_a, to_org_id=org_a
+        )
         db_session.flush()
 
         _enable_rls(db_session)
@@ -134,8 +148,9 @@ class TestRiskAssessmentsRLS:
         _set_org(db_session, org_b)
 
         rows = db_session.execute(text("SELECT id FROM risk_assessments")).fetchall()
-        assert ra_id not in {r[0] for r in rows}, \
-            "Org B must not see Org A's risk assessments"
+        assert ra_id not in {
+            r[0] for r in rows
+        }, "Org B must not see Org A's risk assessments"
 
 
 class TestAlertsRLS:
@@ -200,8 +215,7 @@ class TestAlertsRLS:
         _set_org(db_session, org_b)
 
         rows = db_session.execute(text("SELECT id FROM alerts")).fetchall()
-        assert alert_id not in {r[0] for r in rows}, \
-            "Org B must not see Org A's alerts"
+        assert alert_id not in {r[0] for r in rows}, "Org B must not see Org A's alerts"
 
 
 class TestUploadedDocumentsRLS:
@@ -256,13 +270,16 @@ class TestSpendLeakageRLS:
         _enable_rls(db_session)
         _set_org(db_session, org_b)
 
-        rows = db_session.execute(text("SELECT id FROM spend_leakage_findings")).fetchall()
+        rows = db_session.execute(
+            text("SELECT id FROM spend_leakage_findings")
+        ).fetchall()
         assert finding_id not in {r[0] for r in rows}
 
 
 # ---------------------------------------------------------------------------
 # 6. companies is NOT RLS-restricted — must be cross-tenant readable
 # ---------------------------------------------------------------------------
+
 
 class TestCompaniesIsGlobal:
     def test_company_visible_across_tenants(self, db_session):
@@ -284,13 +301,15 @@ class TestCompaniesIsGlobal:
             text("SELECT id FROM companies WHERE id = :id"),
             {"id": co},
         ).fetchone()
-        assert row is not None, \
-            "companies must be readable cross-tenant — it is global reference data"
+        assert (
+            row is not None
+        ), "companies must be readable cross-tenant — it is global reference data"
 
 
 # ---------------------------------------------------------------------------
 # 7. UNIQUE (org_id, event_id, company_id) on risk_assessments is idempotent
 # ---------------------------------------------------------------------------
+
 
 class TestRiskAssessmentUniqueConstraint:
     def test_recompute_upserts_not_duplicates(self, db_session):
@@ -340,6 +359,7 @@ class TestRiskAssessmentUniqueConstraint:
 # ---------------------------------------------------------------------------
 # 8. alert_must_have_evidence trigger fires on bare INSERT
 # ---------------------------------------------------------------------------
+
 
 class TestAlertMustHaveEvidenceTrigger:
     def test_alert_without_evidence_raises(self, db_session):
@@ -400,6 +420,7 @@ class TestAlertMustHaveEvidenceTrigger:
 # 9. Trigram index is used for fuzzy name search on companies
 # ---------------------------------------------------------------------------
 
+
 class TestTrigramIndex:
     def test_trigram_similarity_finds_fuzzy_match(self, db_session):
         """
@@ -429,9 +450,7 @@ class TestTrigramIndex:
         db_session.flush()
 
         row = db_session.execute(
-            text(
-                "SELECT id FROM companies WHERE name_norm = 'exact match industries'"
-            )
+            text("SELECT id FROM companies WHERE name_norm = 'exact match industries'")
         ).fetchone()
         assert row is not None
 
@@ -440,22 +459,43 @@ class TestTrigramIndex:
 # 10. Migration up/down: check_db_connection works against test schema
 # ---------------------------------------------------------------------------
 
+
 class TestSchemaIntegrity:
     def test_all_expected_tables_exist(self, db_session):
         expected = {
-            "organizations", "organization_members",
-            "companies", "company_identifiers", "company_aliases",
+            "organizations",
+            "organization_members",
+            "companies",
+            "company_identifiers",
+            "company_aliases",
             "entity_resolution_reviews",
-            "supplier_relationships", "locations", "company_locations",
-            "data_sources", "source_records", "source_record_versions",
+            "supplier_relationships",
+            "locations",
+            "company_locations",
+            "data_sources",
+            "source_records",
+            "source_record_versions",
             "dead_letter_queue",
-            "events", "event_source_records", "event_entities",
-            "risk_model_versions", "risk_assessments",
-            "alerts", "alert_evidence", "alert_actions",
-            "uploaded_documents", "contracts", "purchase_orders",
-            "spend_records", "spend_leakage_findings",
-            "documents", "document_chunks", "embeddings", "agent_runs",
-            "notification_preferences", "notifications", "notification_deliveries",
+            "events",
+            "event_source_records",
+            "event_entities",
+            "risk_model_versions",
+            "risk_assessments",
+            "alerts",
+            "alert_evidence",
+            "alert_actions",
+            "uploaded_documents",
+            "contracts",
+            "purchase_orders",
+            "spend_records",
+            "spend_leakage_findings",
+            "documents",
+            "document_chunks",
+            "embeddings",
+            "agent_runs",
+            "notification_preferences",
+            "notifications",
+            "notification_deliveries",
             "audit_logs",
         }
         rows = db_session.execute(
@@ -473,10 +513,16 @@ class TestSchemaIntegrity:
 
     def test_rls_enabled_on_tenant_tables(self, db_session):
         rls_tables = {
-            "supplier_relationships", "risk_assessments", "alerts",
-            "uploaded_documents", "contracts", "purchase_orders",
-            "spend_records", "spend_leakage_findings",
-            "notification_preferences", "notifications",
+            "supplier_relationships",
+            "risk_assessments",
+            "alerts",
+            "uploaded_documents",
+            "contracts",
+            "purchase_orders",
+            "spend_records",
+            "spend_leakage_findings",
+            "notification_preferences",
+            "notifications",
         }
         rows = db_session.execute(
             text(
@@ -525,5 +571,80 @@ class TestSchemaIntegrity:
             )
         ).fetchall()
         granted = {r[0] for r in priv_rows}
-        assert "UPDATE" not in granted, "provenance_app must not have UPDATE on audit_logs"
-        assert "DELETE" not in granted, "provenance_app must not have DELETE on audit_logs"
+        assert (
+            "UPDATE" not in granted
+        ), "provenance_app must not have UPDATE on audit_logs"
+        assert (
+            "DELETE" not in granted
+        ), "provenance_app must not have DELETE on audit_logs"
+
+
+# ---------------------------------------------------------------------------
+# 11. API-level Tenant Isolation (Phase 3 acceptance test)
+# ---------------------------------------------------------------------------
+
+
+class TestApiTenantIsolation:
+    """
+    Verifies that a valid token for Org A cannot read Org B on any implemented endpoint.
+    Acceptance criteria (§Phase 3):
+    'a valid token for org A cannot read org B on any implemented endpoint'
+    """
+
+    @pytest.mark.asyncio
+    async def test_org_a_token_cannot_read_org_b_endpoints(self, monkeypatch):
+        import time
+        from httpx import ASGITransport, AsyncClient
+        from jose import jwt
+        from app.config import get_settings
+        from app.main import app
+
+        secret = "tenant-isolation-test-secret"
+        monkeypatch.setattr(get_settings(), "secret_key", secret)
+        monkeypatch.setattr(get_settings(), "auth_issuer", "")
+        monkeypatch.setattr(get_settings(), "auth_audience", "")
+
+        org_a = uuid.uuid4()
+        org_b = uuid.uuid4()
+
+        token_a = jwt.encode(
+            {
+                "sub": "user_a",
+                "org_id": str(org_a),
+                "role": "org_admin",
+                "exp": int(time.time()) + 3600,
+            },
+            secret,
+            algorithm="HS256",
+        )
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            headers = {"Authorization": f"Bearer {token_a}"}
+
+            # Attempt to read Org B details
+            res_org = await client.get(
+                f"/api/v1/organizations/{org_b}", headers=headers
+            )
+            assert (
+                res_org.status_code == 403
+            ), "Org A token must NOT be allowed to read Org B"
+
+            # Attempt to list Org B members
+            res_members = await client.get(
+                f"/api/v1/organizations/{org_b}/members", headers=headers
+            )
+            assert (
+                res_members.status_code == 403
+            ), "Org A token must NOT be allowed to list Org B members"
+
+            # Attempt to patch Org B
+            res_patch = await client.patch(
+                f"/api/v1/organizations/{org_b}",
+                json={"name": "Attacked"},
+                headers=headers,
+            )
+            assert (
+                res_patch.status_code == 403
+            ), "Org A token must NOT be allowed to mutate Org B"

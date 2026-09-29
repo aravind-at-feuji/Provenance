@@ -31,11 +31,14 @@ def db_engine():
     engine = create_engine(_sync_url(), echo=False)
 
     # Extensions must exist (created by init.sql in docker or manually)
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"))
-        conn.commit()
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"))
+            conn.commit()
+    except Exception as exc:
+        pytest.skip(f"Live PostgreSQL test database not available: {exc}")
 
     # Import models so metadata is populated, then run the migration
     import app.db.models  # noqa: F401
@@ -43,7 +46,10 @@ def db_engine():
 
     Base.metadata.create_all(engine)
     yield engine
-    Base.metadata.drop_all(engine)
+    try:
+        Base.metadata.drop_all(engine)
+    except Exception:
+        pass
 
 
 @pytest.fixture

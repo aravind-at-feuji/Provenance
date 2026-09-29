@@ -6,14 +6,13 @@ Tables: organizations, organization_members
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     ARRAY,
     BigInteger,
-    Boolean,
     DateTime,
     ForeignKey,
-    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -59,7 +58,9 @@ class Organization(AuditMixin, SoftDeleteMixin, Base):
     )
 
     # Arbitrary org-level settings (notification preferences, feature flags, etc.)
-    settings: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    settings: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
 
     # Per-tenant monthly LLM token budget (enforced by LLMGateway)
     monthly_token_budget: Mapped[int] = mapped_column(
@@ -88,9 +89,7 @@ class OrganizationMember(AuditMixin, SoftDeleteMixin, Base):
     """
 
     __tablename__ = "organization_members"
-    __table_args__ = (
-        UniqueConstraint("org_id", "user_id", name="uq_org_member"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "user_id", name="uq_org_member"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -118,17 +117,11 @@ class OrganizationMember(AuditMixin, SoftDeleteMixin, Base):
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
 
-    invited_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    joined_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    organization: Mapped["Organization"] = relationship(
-        "Organization", back_populates="members"
-    )
+    organization: Mapped["Organization"] = relationship("Organization", back_populates="members")
 
     def __repr__(self) -> str:
         return f"<OrganizationMember org={self.org_id} user={self.user_id} role={self.role!r}>"

@@ -46,6 +46,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency — yields an AsyncSession and closes it after the request."""
     factory = get_session_factory()
     async with factory() as session:
+        from app.auth.context import get_current_tenant_id
+
+        org_id = get_current_tenant_id()
+        if org_id is not None:
+            await session.execute(
+                text("SELECT set_config('app.current_org_id', :oid, false)"),
+                {"oid": str(org_id)},
+            )
         yield session
 
 
