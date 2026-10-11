@@ -1,9 +1,8 @@
 # Provenance
-
+![alt text](frontend/public/image.png)
 Supply-chain risk intelligence platform. Monitors regulatory, sanctions, and geopolitical signals; resolves them against your supplier graph; scores business impact deterministically; and delivers cited, evidence-backed alerts to Supply Chain Risk Managers and Category Managers.
 
 ## Architecture
-
 See [`.agents/architecture/architecture.md`](.agents/architecture/architecture.md) for the full technical specification.
 
 **Stack:** Next.js 15 · FastAPI · PostgreSQL 16 (pgvector + pg_trgm) · Redis 7 · Celery · LangGraph · LiteLLM · Clerk · AWS (ECS Fargate + RDS + S3)

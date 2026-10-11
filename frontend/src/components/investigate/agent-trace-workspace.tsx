@@ -4,37 +4,25 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Sparkles,
-  Search,
   Send,
   Loader2,
   CheckCircle2,
   AlertTriangle,
-  ShieldAlert,
-  Globe,
-  Cpu,
-  ArrowRight,
   ExternalLink,
-  Clock,
-  Zap,
-  ArrowUp,
-  Paperclip,
-  Network,
-  Layers,
-  Scale,
-  FileText,
-  RotateCcw,
   Plus,
   BarChart3,
   RefreshCw,
   Building2,
-  DollarSign,
-  ChevronRight,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
   Check,
-  X,
-  Database,
-  Sliders,
+  Network,
+  ArrowUp,
+  ShieldCheck,
+  User,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -97,42 +85,55 @@ export interface TraceRecord {
   };
 }
 
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  traceRecord?: TraceRecord;
+}
+
 export interface SuggestionItem {
   id: string;
   title: string;
   prompt: string;
-  category: "exposure" | "disruption" | "concentration" | "deep_tier" | "action";
+  category: "greeting" | "action" | "exposure" | "disruption";
   icon: string;
+  description: string;
 }
 
 const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
   {
     id: "sug-1",
+    title: "Say Hello",
+    prompt: "Hello! What can you help me with?",
+    category: "greeting",
+    icon: "Sparkles",
+    description: "Start a friendly conversation with the copilot",
+  },
+  {
+    id: "sug-2",
     title: "Add a Supplier",
     prompt: "Add a supplier Taiwan Semiconductor (TSMC) in TW with tier 1 and spend $15M",
     category: "action",
     icon: "Plus",
-  },
-  {
-    id: "sug-2",
-    title: "Perform Company Analysis",
-    prompt: "Perform analyses on the data of the company Cotiviti",
-    category: "exposure",
-    icon: "BarChart3",
+    description: "Enroll and resolve a vendor node in graph",
   },
   {
     id: "sug-3",
-    title: "Get and Fetch",
-    prompt: "Get and fetch live regulatory disruption events and supplier catalog telemetry",
-    category: "disruption",
-    icon: "RefreshCw",
+    title: "Analyze Company Risk",
+    prompt: "Perform analyses on the data of the company Cotiviti",
+    category: "exposure",
+    icon: "BarChart3",
+    description: "Run deterministic risk calculation & synthesis",
   },
   {
     id: "sug-4",
-    title: "Single-Source Audit",
-    prompt: "Identify all single-source supplier dependencies and sole-source tier-1 components",
-    category: "concentration",
-    icon: "ShieldAlert",
+    title: "Get & Fetch Live Feeds",
+    prompt: "Get and fetch live regulatory disruption events and supplier catalog telemetry",
+    category: "disruption",
+    icon: "RefreshCw",
+    description: "Sync live regulatory signals and catalog state",
   },
 ];
 
@@ -144,15 +145,19 @@ export function AgentTraceWorkspace(): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [traces, setTraces] = useState<TraceRecord[]>([]);
-  const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"analysis" | "trace" | "citations" | "fetched">("analysis");
+
+  // Conversational message history (ChatGPT / Claude format)
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Collapsible sections per message
+  const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
+  const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
+  const [expandedFetched, setExpandedFetched] = useState<Record<string, boolean>>({});
   const [fetchedSubTab, setFetchedSubTab] = useState<"events" | "suppliers">("events");
 
   // Modals state
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
   const [isAnalyzeCompanyOpen, setIsAnalyzeCompanyOpen] = useState(false);
-  const [isFetchEventsOpen, setIsFetchEventsOpen] = useState(false);
 
   // Form states for Add Supplier
   const [newSupplierName, setNewSupplierName] = useState("");
@@ -170,15 +175,22 @@ export function AgentTraceWorkspace(): React.JSX.Element {
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Live Ingested Events state
-  const [recentEvents, setRecentEvents] = useState<Array<Record<string, unknown>>>([]);
-  const [isFetchingEvents, setIsFetchingEvents] = useState(false);
+  // Auto-scroll ref
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-resizing textarea
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
-    minHeight: 64,
-    maxHeight: 220,
+    minHeight: 48,
+    maxHeight: 180,
   });
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading, scrollToBottom]);
 
   // Load existing suppliers for quick selector
   const loadSuppliersForSelector = useCallback(async () => {
@@ -210,6 +222,25 @@ export function AgentTraceWorkspace(): React.JSX.Element {
   useEffect(() => {
     loadSuppliersForSelector();
   }, [loadSuppliersForSelector]);
+
+  // Toggle helpers
+  const toggleTrace = (msgId: string) => {
+    setExpandedTraces((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
+  const toggleCitations = (msgId: string) => {
+    setExpandedCitations((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
+  const toggleFetched = (msgId: string) => {
+    setExpandedFetched((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
+  const handleClearChat = () => {
+    setMessages([]);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
 
   // ── Action 1: Add Supplier ─────────────────────────────────────────────────
   const handleAddSupplier = async (e?: React.FormEvent) => {
@@ -255,8 +286,8 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           id: `trace-${Date.now()}`,
           action_type: "add_supplier",
           title: `Supplier Enrolled: ${payload.legal_name}`,
-          summary: `Successfully created and verified supplier relationship for ${payload.legal_name} (${payload.country}) in tenant catalog. Linked to Tier ${payload.tier} under category ${payload.category}.`,
-          details: `Canonical company record initialized, supplier edge linked with annual contract spend of $${payload.annual_spend_usd.toLocaleString()}, and criticality index ${payload.criticality}/5.`,
+          summary: `Successfully enrolled ${payload.legal_name} (${payload.country}) in tenant catalog. Linked to Tier ${payload.tier} under category ${payload.category}.`,
+          details: `Canonical company record initialized, supplier edge linked with annual spend of $${payload.annual_spend_usd.toLocaleString()}, and criticality index ${payload.criticality}/5.`,
           risk_level: payload.single_source ? "high" : "low",
           recommended_actions: [
             "Trigger entity screening against OFAC, EU, and UN sanctions lists",
@@ -302,8 +333,22 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           metadata: data,
         };
 
-        setTraces((prev) => [traceRecord, ...prev]);
-        setActiveTraceId(traceRecord.id);
+        const userMsg: ChatMessage = {
+          id: `msg-${Date.now()}-u`,
+          role: "user",
+          content: `Add supplier ${payload.legal_name} (${payload.country}) with Tier ${payload.tier} and spend $${payload.annual_spend_usd.toLocaleString()}`,
+          createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now()}-a`,
+          role: "assistant",
+          content: `I've successfully enrolled **${payload.legal_name}** (${payload.country}) into your supplier network as a Tier ${payload.tier} supplier with an annual contract spend of $${payload.annual_spend_usd.toLocaleString()}. The entity resolution cascade linked the canonical company record, and the node is now actively monitored in your graph.`,
+          createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          traceRecord,
+        };
+
+        setMessages((prev) => [...prev, userMsg, assistantMsg]);
         setSuccessMessage(`Supplier "${payload.legal_name}" added successfully.`);
         setIsAddSupplierOpen(false);
 
@@ -392,8 +437,22 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           created_at: new Date().toISOString(),
         };
 
-        setTraces((prev) => [traceRecord, ...prev]);
-        setActiveTraceId(traceRecord.id);
+        const userMsg: ChatMessage = {
+          id: `msg-${Date.now()}-u`,
+          role: "user",
+          content: `Analyze risk factors and exposure for ${name}`,
+          createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now()}-a`,
+          role: "assistant",
+          content: data.summary || `Here is the comprehensive risk assessment for **${name}**. I evaluated direct Tier-1 dependencies, active regulatory notices, and exposure scores.`,
+          createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          traceRecord,
+        };
+
+        setMessages((prev) => [...prev, userMsg, assistantMsg]);
         setIsAnalyzeCompanyOpen(false);
       } else {
         const err = await res.json().catch(() => ({}));
@@ -406,9 +465,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
     }
   };
 
-  // ── Action 3: Get & Fetch (Live Regulatory Signals, Suppliers & Risk Telemetry) ──
+  // ── Action 3: Get & Fetch (Live Signals, Suppliers & Risk Telemetry) ──────
   const handleGetAndFetchData = async () => {
-    setIsFetchingEvents(true);
+    setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
     const startTime = performance.now();
@@ -432,9 +491,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
       const events: Array<Record<string, unknown>> = eventsJson.data || [];
       const suppliers: Array<Record<string, unknown>> = suppliersJson.data || [];
-      setRecentEvents(events);
 
-      // Update companyList with active suppliers
       if (suppliers.length > 0) {
         const mapped = suppliers.map((s: Record<string, unknown>) => {
           const comp = (s.company as Record<string, unknown>) || {};
@@ -507,28 +564,104 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         },
       };
 
-      setTraces((prev) => [traceRecord, ...prev]);
-      setActiveTraceId(traceRecord.id);
-      setActiveTab("fetched");
+      const userMsg: ChatMessage = {
+        id: `msg-${Date.now()}-u`,
+        role: "user",
+        content: "Get and fetch live regulatory disruption events and supplier catalog",
+        createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+
+      const assistantMsg: ChatMessage = {
+        id: `msg-${Date.now()}-a`,
+        role: "assistant",
+        content: `I've refreshed and synchronized live data from your PostgreSQL pipeline! Retrieved **${events.length} active regulatory notices** across global trade jurisdictions and loaded **${suppliers.length} active supplier nodes**. You can inspect the fetched records and run instant risk assessments below.`,
+        createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        traceRecord,
+      };
+
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setSuccessMessage(`Get & Fetch complete: retrieved ${events.length} events and ${suppliers.length} suppliers.`);
-      setIsFetchEventsOpen(false);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Error connecting to backend services");
     } finally {
-      setIsFetchingEvents(false);
+      setIsLoading(false);
     }
   };
 
-  const handleFetchLiveEvents = handleGetAndFetchData;
-
-  // ── Action 4: Natural Language Query / Command Dispatcher ──────────────────
+  // ── Action 4: Conversational Natural Language Query & Command Dispatcher ───
   const handleExecuteCommand = async (commandText: string) => {
     const trimmed = commandText.trim();
     if (!trimmed || isLoading) return;
 
+    // 1. Add user message immediately
+    const userMsg: ChatMessage = {
+      id: `msg-${Date.now()}-u`,
+      role: "user",
+      content: trimmed,
+      createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setQuery("");
+    adjustHeight(true);
+
     const lower = trimmed.toLowerCase();
 
-    // 1. Detect "add a supplier" / "add a suplier" / "add supplier" / "add suplier" command
+    // 2. Friendly Conversational Greeting Fast-Path
+    const GREETING_WORDS = [
+      "hello", "hi", "hey", "hello there", "hi there", "hey there", "hola",
+      "good morning", "good afternoon", "good evening", "how are you", "how are you doing",
+      "who are you", "what can you do", "help", "greetings", "sup", "yo", "thanks", "thank you"
+    ];
+    const normalized = lower.replace(/[?!.,]+$/, "").trim();
+    const words = normalized.split(/\s+/);
+    const isGreeting = GREETING_WORDS.includes(normalized) || (
+      normalized.startsWith("hello") || normalized.startsWith("hi") || normalized.startsWith("hey")
+    ) && words.length <= 3;
+
+    if (isGreeting) {
+      const assistantMsg: ChatMessage = {
+        id: `msg-${Date.now()}-a`,
+        role: "assistant",
+        content: "Hello! Great to connect with you. I'm your Provenance supply chain copilot. How can I help you today? You can ask me to evaluate supplier risks, add new suppliers, fetch live regulatory events, or audit single-source chokepoints in your network.",
+        createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        traceRecord: {
+          id: `trace-${Date.now()}`,
+          action_type: "query",
+          title: "Conversational Greeting",
+          summary: "Hello! Great to connect with you. I'm your Provenance supply chain copilot.",
+          risk_level: "informational",
+          recommended_actions: [
+            "Analyze risk factors for active suppliers",
+            "Add a new supplier node to catalog",
+            "Fetch latest regulatory disruption signals",
+          ],
+          key_findings: [
+            "System operational and monitoring tenant supply chain network",
+            "Copilot ready for conversational inquiries and commands",
+          ],
+          execution_trace: [
+            {
+              step_id: "s1_greet",
+              name: "Conversational Handshake",
+              action: "Recognized greeting handshake and initialized friendly copilot dialogue",
+              status: "completed",
+              details: "Responded naturally without alarmist risk escalation",
+              duration_ms: 10,
+            },
+          ],
+          model: "Provenance Copilot",
+          provider: "SYSTEM",
+          latency_ms: 10,
+          created_at: new Date().toISOString(),
+        },
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      return;
+    }
+
+    // 3. Detect "add a supplier" command
     const addSupplierRegex = /^(?:add|create|enroll)\s+(?:a\s+)?su(?:p|pp)lier(?:\s+(.*))?$/i;
     const addVendorRegex = /^(?:add|create|enroll)\s+(?:a\s+)?vendor(?:\s+(.*))?$/i;
     const addSupplierMatch = trimmed.match(addSupplierRegex) || trimmed.match(addVendorRegex);
@@ -536,7 +669,6 @@ export function AgentTraceWorkspace(): React.JSX.Element {
     if (addSupplierMatch) {
       const rest = addSupplierMatch[1]?.trim() || "";
       if (rest) {
-        // Parse country e.g. "in Taiwan" or "in TW"
         const countryMatch = rest.match(/^(.*?)\s+in\s+([A-Za-z\s]+?)(?:\s+with.*)?$/i);
         if (countryMatch) {
           setNewSupplierName(countryMatch[1].trim());
@@ -551,11 +683,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           setNewSupplierName(rest.replace(/\s+with.*$/i, "").trim());
         }
 
-        // Parse tier e.g. "tier 1"
         const tierMatch = rest.match(/tier\s*(\d)/i);
         if (tierMatch) setNewSupplierTier(Number(tierMatch[1]));
 
-        // Parse spend e.g. "$15M", "$500k"
         const spendMatch = rest.match(/\$(\d+(?:\.\d+)?)\s*(m|k|million|thousand)?/i);
         if (spendMatch) {
           const val = parseFloat(spendMatch[1]);
@@ -568,12 +698,10 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         setNewSupplierName("");
       }
       setIsAddSupplierOpen(true);
-      setQuery("");
-      adjustHeight(true);
       return;
     }
 
-    // 2. Detect "perform analyses on the data of the company", "analyze company...", "audit company..."
+    // 4. Detect "perform analyses on company" command
     const analyzeRegex = /^(?:perform\s+(?:an?\s+)?analys(?:is|es)\s+on\s+(?:the\s+data\s+of\s+)?(?:the\s+company\s+)?|analyze\s+(?:the\s+data\s+of\s+)?(?:the\s+company\s+|company\s+)?|audit\s+(?:the\s+data\s+of\s+)?(?:company\s+)?)(.*)$/i;
     const analyzeMatch = trimmed.match(analyzeRegex);
 
@@ -587,34 +715,24 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         );
         if (found) {
           handleAnalyzeCompany(found.id, found.name);
-          setQuery("");
-          adjustHeight(true);
           return;
         }
-        // If company not currently in loaded list, proceed with target name directly
         handleAnalyzeCompany(undefined, target);
-        setQuery("");
-        adjustHeight(true);
         return;
       } else {
-        // Generic request: open company selector
         setIsAnalyzeCompanyOpen(true);
-        setQuery("");
-        adjustHeight(true);
         return;
       }
     }
 
-    // 3. Detect "get and fetch", "get and fetch data", "fetch data", "fetch events", "fetch signals", "get suppliers"
+    // 5. Detect "get and fetch" command
     const getAndFetchRegex = /^(?:get\s+and\s+fetch|get\s*&\s*fetch|get\s+data|fetch\s+data|fetch\s+signals?|get\s+signals?|fetch\s+events?|get\s+events?|fetch\s+suppliers?|get\s+suppliers?)(?:\s+.*)?$/i;
     if (getAndFetchRegex.test(trimmed) || lower === "get and fetch" || lower === "fetch" || lower === "get & fetch") {
       handleGetAndFetchData();
-      setQuery("");
-      adjustHeight(true);
       return;
     }
 
-    // 4. Default: Run Agent 4 Conversational Investigation
+    // 6. Default: Conversational Investigation Query via Backend LLM
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -631,9 +749,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         headers,
         body: JSON.stringify({
           query: trimmed,
-          conversation_history: traces.slice(0, 3).map((t) => ({
-            role: "assistant",
-            content: t.summary,
+          conversation_history: messages.slice(-4).map((m) => ({
+            role: m.role,
+            content: m.content,
           })),
         }),
       });
@@ -656,21 +774,26 @@ export function AgentTraceWorkspace(): React.JSX.Element {
             {
               step_id: "s1_query",
               name: "Autonomous Investigation",
-              action: "Traversed graph and synthesized answer",
+              action: "Traversed graph and synthesized evidence chain",
               status: "completed",
               duration_ms: elapsed,
             },
           ],
-          model: data.model || "Sonnet 3.5",
-          provider: data.provider || "ANTHROPIC",
+          model: data.model || "Provenance Copilot",
+          provider: data.provider || "SYSTEM",
           latency_ms: elapsed,
           created_at: new Date().toISOString(),
         };
 
-        setTraces((prev) => [traceRecord, ...prev]);
-        setActiveTraceId(traceRecord.id);
-        setQuery("");
-        adjustHeight(true);
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now()}-a`,
+          role: "assistant",
+          content: data.summary || "Here is what I found based on your live supply chain network and regulatory feeds.",
+          createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          traceRecord,
+        };
+
+        setMessages((prev) => [...prev, assistantMsg]);
       } else {
         const err = await res.json().catch(() => ({}));
         setErrorMessage(err.detail || err.title || "Investigation agent request failed");
@@ -691,9 +814,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
     }
   };
 
-  const activeTrace = traces.find((t) => t.id === activeTraceId) || traces[0] || null;
-
-  const getRiskBadgeVariant = (level?: string) => {
+  const getRiskBadgeVariant = (level?: string): "critical" | "high" | "medium" | "low" | "secondary" => {
     switch (level?.toLowerCase()) {
       case "critical":
         return "critical";
@@ -701,120 +822,447 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         return "high";
       case "medium":
         return "medium";
+      case "low":
+        return "low";
+      case "informational":
       default:
         return "secondary";
     }
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-12">
-      {/* ── Page Header: Agent Trace ────────────────────────────────────────── */}
-      <div className="text-center space-y-3 pt-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700 text-xs font-semibold font-mono">
-          <Sparkles className="w-3.5 h-3.5 text-[#FA651E]" />
-          <span>AGENT TRACE · AUTONOMOUS COPILOT</span>
+    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl mx-auto w-full relative">
+      {/* ── Top Header Bar (ChatGPT / Claude Style) ────────────────────────── */}
+      <div className="flex items-center justify-between pb-3 mb-2 border-b border-neutral-100 dark:border-neutral-800/80 px-2 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#FA651E]/10 border border-[#FA651E]/20 text-[#FA651E] flex items-center justify-center">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold text-neutral-900 dark:text-white tracking-tight">
+                Agent Trace
+              </h1>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Autonomous Copilot Online" />
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              Autonomous Supply Chain Copilot
+            </p>
+          </div>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
-          Agent Trace
-        </h1>
-        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-          Command your supply chain network: add suppliers, perform mathematical risk analyses, fetch live regulatory feeds, and inspect full execution traces.
-        </p>
-      </div>
 
-      {/* ── System Actions Bar ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <button
-          type="button"
-          onClick={() => setIsAddSupplierOpen(true)}
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-[#FA651E]/40 hover:bg-neutral-50 dark:hover:bg-neutral-800/80 transition-all text-left shadow-2xs group"
-        >
-          <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/60 dark:border-emerald-800/40 group-hover:scale-105 transition-transform">
-            <Plus className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-neutral-900 dark:text-white">Add Supplier</div>
-            <div className="text-[11px] text-neutral-400">Enroll new node</div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setIsAnalyzeCompanyOpen(true)}
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-[#FA651E]/40 hover:bg-neutral-50 dark:hover:bg-neutral-800/80 transition-all text-left shadow-2xs group"
-        >
-          <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/60 dark:border-blue-800/40 group-hover:scale-105 transition-transform">
-            <BarChart3 className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-neutral-900 dark:text-white">Analyze Company</div>
-            <div className="text-[11px] text-neutral-400">Run risk formulas</div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleGetAndFetchData}
-          disabled={isFetchingEvents}
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-[#FA651E]/40 hover:bg-neutral-50 dark:hover:bg-neutral-800/80 transition-all text-left shadow-2xs group"
-        >
-          <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/60 dark:border-amber-800/40 group-hover:scale-105 transition-transform">
-            {isFetchingEvents ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          </div>
-          <div>
-            <div className="text-xs font-bold text-neutral-900 dark:text-white">Get &amp; Fetch</div>
-            <div className="text-[11px] text-neutral-400">Sync live feeds &amp; catalog</div>
-          </div>
-        </button>
-
-        <Link
-          href="/graph"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-[#FA651E]/40 hover:bg-neutral-50 dark:hover:bg-neutral-800/80 transition-all text-left shadow-2xs group"
-        >
-          <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 border border-purple-200/60 dark:border-purple-800/40 group-hover:scale-105 transition-transform">
-            <Network className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-neutral-900 dark:text-white">Fetch Graph</div>
-            <div className="text-[11px] text-neutral-400">View topology</div>
-          </div>
-        </Link>
-      </div>
-
-      {/* ── Main AI Command & Query Box ──────────────────────────────────── */}
-      <div className="w-full space-y-4">
-        {errorMessage && (
-          <div className="flex items-center justify-between p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-muted-foreground hover:text-foreground text-xs underline ml-2"
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleClearChat}
+              className="text-xs h-8 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white gap-1.5"
             >
-              Dismiss
-            </button>
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>New Chat</span>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Alerts & Error Banners ────────────────────────────────────────── */}
+      {errorMessage && (
+        <div className="mx-2 mb-3 flex items-center justify-between p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive shrink-0">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button onClick={() => setErrorMessage(null)} className="underline text-xs ml-2">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="mx-2 mb-3 flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400 shrink-0">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+          <button onClick={() => setSuccessMessage(null)} className="underline text-xs ml-2">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* ── Chat Messages Scroll Area (ChatGPT / Claude Style) ─────────────── */}
+      <div className="flex-1 overflow-y-auto px-2 space-y-6 pb-44">
+        {messages.length === 0 ? (
+          /* Empty Chat Welcome State */
+          <div className="py-8 sm:py-12 text-center space-y-8 max-w-2xl mx-auto">
+            <div className="space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 text-[#FA651E] flex items-center justify-center mx-auto shadow-sm">
+                <Sparkles className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
+                How can I help with your supply chain today?
+              </h2>
+              <p className="text-xs sm:text-sm text-neutral-500 max-w-lg mx-auto leading-relaxed">
+                I can help you analyze supplier risks, enroll new vendors, fetch real-time regulatory feeds, or answer questions conversationally like a trusted colleague.
+              </p>
+            </div>
+
+            {/* Quick Action Tiles */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+              {DEFAULT_SUGGESTIONS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleExecuteCommand(item.prompt)}
+                  className="p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-[#FA651E]/40 hover:bg-neutral-50/80 dark:hover:bg-neutral-800/80 transition-all text-left shadow-2xs group space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-[#FA651E] transition-colors">
+                      {item.title}
+                    </span>
+                    <Sparkles className="w-3.5 h-3.5 text-neutral-400 group-hover:text-[#FA651E] transition-colors" />
+                  </div>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">
+                    {item.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Message Stream: User Questions & Agent Answers */
+          messages.map((msg) => (
+            <div key={msg.id} className="space-y-3">
+              {msg.role === "user" ? (
+                /* User Message Bubble */
+                <div className="flex justify-end items-start gap-3 pl-12">
+                  <div className="bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-950 px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed shadow-xs max-w-xl">
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <span className="block text-[10px] text-neutral-400 dark:text-neutral-500 text-right mt-1 font-mono">
+                      {msg.createdAt}
+                    </span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center shrink-0 text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                    <User className="w-4 h-4" />
+                  </div>
+                </div>
+              ) : (
+                /* Assistant Message Block */
+                <div className="flex items-start gap-3.5 pr-4 sm:pr-8">
+                  <div className="w-8 h-8 rounded-xl bg-[#FA651E]/10 border border-[#FA651E]/20 text-[#FA651E] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-3 flex-1 min-w-0">
+                    {/* Primary Conversational Text */}
+                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 rounded-2xl rounded-tl-sm p-4 text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed shadow-2xs space-y-2">
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      {msg.traceRecord?.details && (
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed pt-2 border-t border-neutral-100 dark:border-neutral-800 whitespace-pre-line">
+                          {msg.traceRecord.details}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 pt-1 text-[10px] text-neutral-400 font-mono">
+                        <span>{msg.createdAt}</span>
+                        {msg.traceRecord?.latency_ms ? <span>· {msg.traceRecord.latency_ms}ms</span> : null}
+                        {msg.traceRecord?.model ? <span>· {msg.traceRecord.model}</span> : null}
+                      </div>
+                    </div>
+
+                    {/* Rich Embedded Trace Widget (if traceRecord exists) */}
+                    {msg.traceRecord && (
+                      <div className="p-3.5 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40 space-y-3 text-xs">
+                        {/* Meta bar */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] font-mono uppercase py-0 font-bold">
+                              {msg.traceRecord.action_type.replace("_", " ")}
+                            </Badge>
+                            {msg.traceRecord.risk_level && msg.traceRecord.risk_level !== "informational" && (
+                              <Badge
+                                variant={getRiskBadgeVariant(msg.traceRecord.risk_level)}
+                                className="text-[10px] font-mono py-0 font-bold uppercase"
+                              >
+                                {msg.traceRecord.risk_level} risk
+                              </Badge>
+                            )}
+                            {msg.traceRecord.risk_level === "informational" && (
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
+                                Copilot Response
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 text-[11px]">
+                            {msg.traceRecord.execution_trace.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleTrace(msg.id)}
+                                className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-neutral-600 dark:text-neutral-300 transition-colors flex items-center gap-1 text-[11px]"
+                              >
+                                <span>Trace ({msg.traceRecord.execution_trace.length})</span>
+                                {expandedTraces[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            )}
+                            {msg.traceRecord.citations && msg.traceRecord.citations.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleCitations(msg.id)}
+                                className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-neutral-600 dark:text-neutral-300 transition-colors flex items-center gap-1 text-[11px]"
+                              >
+                                <span>Citations ({msg.traceRecord.citations.length})</span>
+                                {expandedCitations[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            )}
+                            {msg.traceRecord.fetchedData && (
+                              <button
+                                type="button"
+                                onClick={() => toggleFetched(msg.id)}
+                                className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-neutral-600 dark:text-neutral-300 transition-colors flex items-center gap-1 text-[11px]"
+                              >
+                                <span>Records</span>
+                                {expandedFetched[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Verified Facts */}
+                        {msg.traceRecord.key_findings && msg.traceRecord.key_findings.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                              Verified Facts
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {msg.traceRecord.key_findings.map((finding, idx) => (
+                                <div key={idx} className="flex items-start gap-1.5 p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700/60 text-[11px] text-neutral-700 dark:text-neutral-300">
+                                  <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                                  <span>{finding}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Collapsible Execution Trace */}
+                        {expandedTraces[msg.id] && (
+                          <div className="space-y-1.5 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                              Execution Plan &amp; Timings
+                            </span>
+                            <div className="space-y-1.5">
+                              {msg.traceRecord.execution_trace.map((step, idx) => (
+                                <div
+                                  key={step.step_id || idx}
+                                  className="p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 flex items-center justify-between text-[11px]"
+                                >
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="w-3.5 h-3.5 rounded-full bg-neutral-200 text-neutral-700 font-mono text-[9px] flex items-center justify-center font-bold">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="font-bold text-neutral-900 dark:text-white font-mono">{step.name}</span>
+                                      <span className="text-[9px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200/60">
+                                        {step.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-neutral-500 pl-5 text-[10px]">{step.action}</p>
+                                  </div>
+                                  <span className="font-mono text-[10px] text-neutral-400">{step.duration_ms}ms</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Collapsible Citations */}
+                        {expandedCitations[msg.id] && msg.traceRecord.citations && (
+                          <div className="space-y-1.5 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                              Verified Evidence Citations
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {msg.traceRecord.citations.map((c) => (
+                                <div key={c.id} className="p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 space-y-1 text-[11px]">
+                                  <div className="flex items-center justify-between">
+                                    <Badge variant="secondary" className="text-[9px] font-mono py-0">
+                                      {c.citation_type}
+                                    </Badge>
+                                    <span className="text-[10px] font-mono text-emerald-600">
+                                      {Math.round(c.confidence * 100)}%
+                                    </span>
+                                  </div>
+                                  <div className="font-bold text-neutral-900 dark:text-white">{c.title}</div>
+                                  <p className="text-neutral-500 text-[10px] line-clamp-2">{c.details}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Collapsible Fetched Records */}
+                        {expandedFetched[msg.id] && msg.traceRecord.fetchedData && (
+                          <div className="space-y-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                            <div className="flex items-center gap-2 border-b border-neutral-200/60 dark:border-neutral-800 pb-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setFetchedSubTab("events")}
+                                className={cn(
+                                  "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors",
+                                  fetchedSubTab === "events"
+                                    ? "bg-neutral-900 text-white font-semibold"
+                                    : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+                                )}
+                              >
+                                Regulatory Events ({msg.traceRecord.fetchedData.events?.length || 0})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFetchedSubTab("suppliers")}
+                                className={cn(
+                                  "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors",
+                                  fetchedSubTab === "suppliers"
+                                    ? "bg-neutral-900 text-white font-semibold"
+                                    : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+                                )}
+                              >
+                                Suppliers ({msg.traceRecord.fetchedData.suppliers?.length || 0})
+                              </button>
+                            </div>
+
+                            {fetchedSubTab === "events" && (
+                              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                {(msg.traceRecord.fetchedData.events || []).map((ev, idx) => (
+                                  <div key={idx} className="p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-100 text-[11px] space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <Badge variant="secondary" className="text-[9px] uppercase font-mono py-0">
+                                        {String(ev.event_type || "Notice")}
+                                      </Badge>
+                                      <span className="text-[10px] text-neutral-400 font-mono">
+                                        {ev.published_at ? new Date(String(ev.published_at)).toLocaleDateString() : "Active"}
+                                      </span>
+                                    </div>
+                                    <p className="text-neutral-800 dark:text-neutral-200">{String(ev.summary || "Notice")}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {fetchedSubTab === "suppliers" && (
+                              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                {(msg.traceRecord.fetchedData.suppliers || []).map((sup, idx) => {
+                                  const comp = (sup.company as Record<string, unknown>) || {};
+                                  const name = String(comp.legal_name || sup.legal_name || "Supplier");
+                                  const country = String(comp.country || sup.country || "US");
+                                  return (
+                                    <div key={idx} className="p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-100 text-[11px] flex items-center justify-between">
+                                      <div className="font-bold text-neutral-900 dark:text-white">
+                                        {name} <span className="font-mono text-[10px] font-normal opacity-70">({country})</span>
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleAnalyzeCompany(String(comp.id || sup.id), name)}
+                                        className="h-6 text-[10px] rounded-lg px-2"
+                                      >
+                                        Analyze
+                                      </Button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Recommended Actions Follow-Up Chips */}
+                        {msg.traceRecord.recommended_actions && msg.traceRecord.recommended_actions.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                              Suggested Follow-ups
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {msg.traceRecord.recommended_actions.map((act, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => handleExecuteCommand(act)}
+                                  className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-[#FA651E]/50 hover:bg-neutral-50 text-[11px] text-neutral-700 dark:text-neutral-300 transition-colors flex items-center gap-1.5"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#FA651E]" />
+                                  <span>{act}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+
+        {/* Thinking Indicator */}
+        {isLoading && (
+          <div className="flex items-start gap-3.5 pr-8 animate-in fade-in duration-200">
+            <div className="w-8 h-8 rounded-xl bg-[#FA651E]/10 border border-[#FA651E]/20 text-[#FA651E] flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles className="w-4 h-4 animate-pulse" />
+            </div>
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 rounded-2xl rounded-tl-sm px-4 py-3 text-xs text-neutral-500 shadow-2xs flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FA651E]" />
+              <span>Agent Trace is thinking...</span>
+            </div>
           </div>
         )}
 
-        {successMessage && (
-          <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{successMessage}</span>
-            </div>
-            <button
-              onClick={() => setSuccessMessage(null)}
-              className="text-muted-foreground hover:text-foreground text-xs underline ml-2"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        <div ref={messagesEndRef} />
+      </div>
 
-        <div className="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 shadow-sm focus-within:ring-2 focus-within:ring-[#FA651E]/20 focus-within:border-[#FA651E] transition-all">
-          <div className="overflow-y-auto">
+      {/* ── Fixed Bottom Input Area (ChatGPT / Claude Style) ──────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-neutral-950 dark:via-neutral-950/95 pt-6 pb-4 px-2 z-20">
+        <div className="max-w-3xl mx-auto space-y-2">
+          {/* Quick Action Shortcuts */}
+          <div className="flex items-center gap-2 px-1 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsAddSupplierOpen(true)}
+              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Add Supplier</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAnalyzeCompanyOpen(true)}
+              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
+              <span>Analyze Company</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleGetAndFetchData}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5 text-amber-600", isLoading && "animate-spin")} />
+              <span>Get &amp; Fetch</span>
+            </button>
+            <Link
+              href="/graph"
+              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs ml-auto"
+            >
+              <Network className="w-3.5 h-3.5 text-purple-600" />
+              <span className="hidden sm:inline">Graph View</span>
+            </Link>
+          </div>
+
+          {/* Chat Input Card */}
+          <div className="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 shadow-md focus-within:ring-2 focus-within:ring-[#FA651E]/20 focus-within:border-[#FA651E] transition-all flex items-end p-2 gap-2">
             <Textarea
               ref={textareaRef}
               value={query}
@@ -824,505 +1272,34 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               }}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
-              placeholder="Instruct Agent Trace: e.g. 'Add supplier TSMC in Taiwan with tier 1', 'Perform analyses on the data of the company Cotiviti', 'Get and fetch live events', or ask any risk question..."
+              placeholder="Message Agent Trace... (e.g. 'hello', 'analyze Cotiviti', 'add supplier TSMC')"
               className={cn(
-                "w-full px-4 py-3.5",
-                "resize-none",
-                "bg-transparent",
-                "border-none",
-                "text-neutral-900 dark:text-white text-sm",
-                "focus:outline-none",
-                "focus-visible:ring-0 focus-visible:ring-offset-0",
-                "placeholder:text-neutral-400 dark:placeholder:text-neutral-500 placeholder:text-sm",
-                "min-h-[64px]"
+                "w-full px-3 py-2 text-sm",
+                "resize-none bg-transparent border-none text-neutral-900 dark:text-white",
+                "focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                "placeholder:text-neutral-400 dark:placeholder:text-neutral-500",
+                "min-h-[44px] max-h-[160px]"
               )}
-              style={{ overflow: "hidden" }}
+              rows={1}
             />
-          </div>
 
-          <div className="flex items-center justify-between p-3 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/60 dark:bg-neutral-900/40 rounded-b-2xl">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsAddSupplierOpen(true)}
-                className="group px-2.5 py-1.5 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 rounded-xl transition-colors flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                title="Add a supplier node"
-              >
-                <Plus className="w-3.5 h-3.5 text-neutral-500" />
-                <span className="hidden sm:inline">Add Supplier</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAnalyzeCompanyOpen(true)}
-                className="group px-2.5 py-1.5 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 rounded-xl transition-colors flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                title="Analyze company"
-              >
-                <BarChart3 className="w-3.5 h-3.5 text-neutral-500" />
-                <span className="hidden sm:inline">Analyze Company</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleGetAndFetchData}
-                disabled={isFetchingEvents}
-                className="group px-2.5 py-1.5 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 rounded-xl transition-colors flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                title="Get and fetch live regulatory data & catalog"
-              >
-                <RefreshCw className={cn("w-3.5 h-3.5 text-neutral-500", isFetchingEvents && "animate-spin")} />
-                <span className="hidden sm:inline">Get &amp; Fetch</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:flex px-2.5 py-1 rounded-lg text-xs font-mono text-neutral-500 border border-dashed border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-[#FA651E]" />
-                <span>Agent Trace</span>
-              </div>
-
-              <Button
-                type="button"
-                onClick={() => handleExecuteCommand(query)}
-                disabled={isLoading || !query.trim()}
-                size="sm"
-                className={cn(
-                  "rounded-xl h-8 px-3.5 text-xs font-semibold gap-1.5 transition-all shadow-2xs",
-                  query.trim()
-                    ? "bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 cursor-pointer"
-                    : "bg-neutral-200 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600 cursor-not-allowed"
-                )}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Executing</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Execute</span>
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Suggestion Action Chips */}
-        <div className="flex items-center justify-center gap-2.5 pt-1 flex-wrap">
-          {DEFAULT_SUGGESTIONS.map((item) => (
-            <button
-              key={item.id}
+            <Button
               type="button"
-              onClick={() => {
-                setQuery(item.prompt);
-                handleExecuteCommand(item.prompt);
-              }}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-3.5 py-1.5 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full border border-neutral-200/80 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors shadow-2xs text-xs font-medium"
+              onClick={() => handleExecuteCommand(query)}
+              disabled={isLoading || !query.trim()}
+              size="icon"
+              className={cn(
+                "w-8 h-8 rounded-xl shrink-0 transition-all",
+                query.trim()
+                  ? "bg-[#FA651E] hover:bg-[#E05310] text-white"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed"
+              )}
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#FA651E]" />
-              <span>{item.title}</span>
-            </button>
-          ))}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
       </div>
-
-      {/* ── Active Execution Trace Result ─────────────────────────────────── */}
-      {activeTrace ? (
-        <div className="space-y-6">
-          <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs overflow-hidden">
-            <CardHeader className="pb-4 border-b border-neutral-100 bg-neutral-50/40">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={getRiskBadgeVariant(activeTrace.risk_level)} className="text-[10px] uppercase font-mono font-bold tracking-wider">
-                      {activeTrace.action_type.replace("_", " ")}
-                    </Badge>
-                    {activeTrace.risk_level && (
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {activeTrace.risk_level} risk
-                      </Badge>
-                    )}
-                    <span className="text-[11px] text-neutral-400 font-mono">
-                      Latency: {activeTrace.latency_ms}ms
-                    </span>
-                    <span className="text-[11px] text-neutral-400 font-mono">
-                      Model: {activeTrace.model || "Agent"}
-                    </span>
-                  </div>
-                  <CardTitle className="text-lg font-bold text-neutral-900 tracking-tight">
-                    {activeTrace.title}
-                  </CardTitle>
-                </div>
-
-                {/* View Switcher Tabs */}
-                <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("analysis")}
-                    className={cn(
-                      "px-3 py-1 rounded-lg text-xs font-medium transition-colors",
-                      activeTab === "analysis" ? "bg-white text-neutral-950 shadow-2xs font-semibold" : "text-neutral-500 hover:text-neutral-900"
-                    )}
-                  >
-                    Action Summary
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("trace")}
-                    className={cn(
-                      "px-3 py-1 rounded-lg text-xs font-medium transition-colors",
-                      activeTab === "trace" ? "bg-white text-neutral-950 shadow-2xs font-semibold" : "text-neutral-500 hover:text-neutral-900"
-                    )}
-                  >
-                    Execution Trace ({activeTrace.execution_trace.length})
-                  </button>
-                  {activeTrace.citations && activeTrace.citations.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("citations")}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-xs font-medium transition-colors",
-                        activeTab === "citations" ? "bg-white text-neutral-950 shadow-2xs font-semibold" : "text-neutral-500 hover:text-neutral-900"
-                      )}
-                    >
-                      Citations ({activeTrace.citations.length})
-                    </button>
-                  )}
-                  {activeTrace.fetchedData && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("fetched")}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-xs font-medium transition-colors",
-                        activeTab === "fetched" ? "bg-white text-neutral-950 shadow-2xs font-semibold" : "text-neutral-500 hover:text-neutral-900"
-                      )}
-                    >
-                      Fetched Records ({(activeTrace.fetchedData.events?.length || 0) + (activeTrace.fetchedData.suppliers?.length || 0)})
-                    </button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="pt-6 space-y-6">
-              {/* Tab 1: Analysis / Summary */}
-              {activeTab === "analysis" && (
-                <div className="space-y-6">
-                  <div className="p-4 rounded-xl bg-neutral-50/70 border border-neutral-200/60 text-sm text-neutral-800 leading-relaxed font-sans">
-                    {activeTrace.summary}
-                  </div>
-
-                  {activeTrace.details && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 font-bold">
-                        Detailed Operational Findings
-                      </h4>
-                      <p className="text-xs text-neutral-600 leading-relaxed whitespace-pre-line bg-white p-3.5 rounded-xl border border-neutral-100">
-                        {activeTrace.details}
-                      </p>
-                    </div>
-                  )}
-
-                  {activeTrace.key_findings && activeTrace.key_findings.length > 0 && (
-                    <div className="space-y-2.5">
-                      <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 font-bold">
-                        Verified Facts &amp; System State
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {activeTrace.key_findings.map((item, idx) => (
-                          <div key={idx} className="flex items-start gap-2 p-2.5 rounded-lg border border-neutral-100 bg-neutral-50/40 text-xs text-neutral-700">
-                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                            <span>{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTrace.recommended_actions && activeTrace.recommended_actions.length > 0 && (
-                    <div className="space-y-2.5">
-                      <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 font-bold">
-                        Recommended Agent Actions
-                      </h4>
-                      <div className="space-y-2">
-                        {activeTrace.recommended_actions.map((act, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-neutral-200/60 bg-white text-xs">
-                            <div className="flex items-center gap-2 text-neutral-800">
-                              <span className="w-5 h-5 rounded-full bg-[#FA651E]/10 text-[#FA651E] font-mono font-bold flex items-center justify-center text-[10px]">
-                                {idx + 1}
-                              </span>
-                              <span>{act}</span>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setQuery(act);
-                                handleExecuteCommand(act);
-                              }}
-                              className="text-[11px] h-7 rounded-lg"
-                            >
-                              Execute
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tab 2: Execution Trace Steps */}
-              {activeTab === "trace" && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 font-bold mb-3">
-                    Multi-Step Agentic Execution Plan
-                  </h4>
-                  <div className="space-y-2.5">
-                    {activeTrace.execution_trace.map((step, idx) => (
-                      <div
-                        key={step.step_id || idx}
-                        className="p-3.5 rounded-xl border border-neutral-200/70 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="w-4 h-4 rounded-full bg-neutral-200 text-neutral-700 font-mono text-[10px] flex items-center justify-center font-bold">
-                              {idx + 1}
-                            </span>
-                            <span className="font-bold text-neutral-900 font-mono">{step.name}</span>
-                            <Badge variant="outline" className="text-[10px] text-emerald-600 bg-emerald-50 border-emerald-200 py-0">
-                              {step.status}
-                            </Badge>
-                          </div>
-                          <p className="text-neutral-600 pl-6">{step.action}</p>
-                          {step.details && (
-                            <p className="text-neutral-400 font-mono text-[11px] pl-6">{step.details}</p>
-                          )}
-                        </div>
-                        <div className="text-[11px] font-mono text-neutral-400 shrink-0 self-end sm:self-center">
-                          {step.duration_ms}ms
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Tab 3: Citations */}
-              {activeTab === "citations" && activeTrace.citations && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 font-bold mb-3">
-                    Verified Citations &amp; Evidence Nodes
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {activeTrace.citations.map((c) => (
-                      <div key={c.id} className="p-3.5 rounded-xl border border-neutral-200/70 bg-neutral-50/50 space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <Badge variant="secondary" className="text-[10px] font-mono">
-                            {c.citation_type}
-                          </Badge>
-                          <span className="text-[11px] font-mono text-emerald-600">
-                            {Math.round(c.confidence * 100)}% confidence
-                          </span>
-                        </div>
-                        <h5 className="font-bold text-neutral-900">{c.title}</h5>
-                        <p className="text-neutral-600 text-[11px]">{c.details}</p>
-                        {c.url && (
-                          <a
-                            href={c.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[#FA651E] hover:underline text-[11px] font-mono pt-1"
-                          >
-                            <span>Inspect source record</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Tab 4: Fetched Records (when get_and_fetch was run) */}
-              {activeTab === "fetched" && activeTrace.fetchedData && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-neutral-100 pb-2 flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFetchedSubTab("events")}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5",
-                          fetchedSubTab === "events"
-                            ? "bg-neutral-900 text-white font-semibold"
-                            : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
-                        )}
-                      >
-                        <Layers className="w-3.5 h-3.5" />
-                        <span>Regulatory Notices ({activeTrace.fetchedData.events?.length || 0})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFetchedSubTab("suppliers")}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5",
-                          fetchedSubTab === "suppliers"
-                            ? "bg-neutral-900 text-white font-semibold"
-                            : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
-                        )}
-                      >
-                        <Building2 className="w-3.5 h-3.5" />
-                        <span>Supplier Catalog ({activeTrace.fetchedData.suppliers?.length || 0})</span>
-                      </button>
-                    </div>
-
-                    <div className="text-[11px] font-mono text-neutral-400">
-                      Live Database Sync · 0 Dummy Records
-                    </div>
-                  </div>
-
-                  {fetchedSubTab === "events" && (
-                    <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                      {(activeTrace.fetchedData.events || []).length === 0 ? (
-                        <div className="py-8 text-center text-neutral-400 text-xs">
-                          No regulatory notices found in ingestion store.
-                        </div>
-                      ) : (
-                        (activeTrace.fetchedData.events || []).map((ev: Record<string, unknown>, idx: number) => {
-                          const jurisdictions = (ev.jurisdictions as string[]) || [];
-                          return (
-                            <div
-                              key={String(ev.id || idx)}
-                              className="p-3 rounded-xl border border-neutral-200/70 bg-neutral-50/50 space-y-1.5 text-xs"
-                            >
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <div className="flex items-center gap-1.5">
-                                  <Badge variant="secondary" className="text-[10px] font-mono uppercase">
-                                    {String(ev.event_type || "Notice")}
-                                  </Badge>
-                                  {jurisdictions.map((j) => (
-                                    <span key={j} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/70 text-neutral-700">
-                                      {j}
-                                    </span>
-                                  ))}
-                                </div>
-                                <span className="text-[10px] font-mono text-neutral-400">
-                                  {ev.published_at ? new Date(String(ev.published_at)).toLocaleDateString() : "Active Notice"}
-                                </span>
-                              </div>
-                              <p className="text-neutral-800 font-medium leading-relaxed">
-                                {String(ev.summary || ev.title || "Regulatory notice item")}
-                              </p>
-                              {Boolean(ev.source_url) && (
-                                <a
-                                  href={String(ev.source_url)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] text-[#FA651E] hover:underline font-mono pt-0.5"
-                                >
-                                  <span>View Official Source</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-
-                  {fetchedSubTab === "suppliers" && (
-                    <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                      {(activeTrace.fetchedData.suppliers || []).length === 0 ? (
-                        <div className="py-8 text-center text-neutral-400 text-xs">
-                          No suppliers found in catalog. Use &ldquo;Add Supplier&rdquo; to enroll one.
-                        </div>
-                      ) : (
-                        (activeTrace.fetchedData.suppliers || []).map((sup: Record<string, unknown>, idx: number) => {
-                          const comp = (sup.company as Record<string, unknown>) || {};
-                          const legalName = String(comp.legal_name || sup.legal_name || "Supplier Node");
-                          const compId = String(comp.id || sup.company_id || sup.id || "");
-                          const country = String(comp.country || sup.country || "US");
-                          const spend = Number(sup.annual_spend_usd || 0);
-                          const tier = Number(sup.tier || 1);
-                          const crit = Number(sup.criticality || 3);
-                          const isSingle = Boolean(sup.single_source);
-
-                          return (
-                            <div
-                              key={String(sup.id || idx)}
-                              className="p-3 rounded-xl border border-neutral-200/70 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                            >
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-neutral-900">{legalName}</span>
-                                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-neutral-200/60 text-neutral-700">
-                                    {country}
-                                  </span>
-                                  <Badge variant="outline" className="text-[10px] font-mono py-0">
-                                    Tier {tier}
-                                  </Badge>
-                                  {isSingle && (
-                                    <Badge variant="critical" className="text-[10px] font-mono py-0">
-                                      Single Source
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-neutral-500 font-mono">
-                                  Spend: ${spend.toLocaleString()} · Criticality: {crit}/5 · Category: {String(sup.category || "Materials")}
-                                </div>
-                              </div>
-
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleAnalyzeCompany(compId, legalName)}
-                                className="text-[11px] h-7 rounded-lg shrink-0"
-                              >
-                                Analyze Risk
-                              </Button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs py-12 text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
-            <Sparkles className="w-6 h-6 text-[#FA651E]" />
-          </div>
-          <div className="space-y-1 max-w-md mx-auto">
-            <h3 className="text-base font-bold text-neutral-900">Agent Trace Ready</h3>
-            <p className="text-xs text-neutral-500 leading-relaxed">
-              Execute any action using the quick action buttons above or type commands directly into the terminal prompt.
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExecuteCommand("Identify all single-source supplier dependencies")}
-              className="rounded-xl text-xs"
-            >
-              Run Audit Command
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setIsAddSupplierOpen(true)}
-              className="rounded-xl text-xs bg-neutral-950 text-white hover:bg-neutral-800"
-            >
-              Add a Supplier
-            </Button>
-          </div>
-        </Card>
-      )}
 
       {/* ── Modal 1: Add Supplier Action ──────────────────────────────────── */}
       <Dialog open={isAddSupplierOpen} onOpenChange={setIsAddSupplierOpen}>
@@ -1333,13 +1310,13 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               <span>Add Supplier Node</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-neutral-500">
-              Agent Trace will canonicalize the company record, link graph edges, and register the supplier into your tenant catalog.
+              Agent Trace will canonicalize the company record, link graph edges, and register the supplier into your catalog.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleAddSupplier} className="space-y-3.5 py-2 text-xs">
             <div className="space-y-1">
-              <label className="font-semibold text-neutral-700">Company Legal Name *</label>
+              <label className="font-semibold text-neutral-700 dark:text-neutral-300">Company Legal Name *</label>
               <Input
                 placeholder="e.g. Taiwan Semiconductor Manufacturing Co"
                 value={newSupplierName}
@@ -1351,7 +1328,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-semibold text-neutral-700">Country Code (2 letters)</label>
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Country Code (2 letters)</label>
                 <Input
                   placeholder="e.g. TW, US, NL, DE, JP"
                   value={newSupplierCountry}
@@ -1361,7 +1338,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                 />
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-neutral-700">Primary Domain</label>
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Primary Domain</label>
                 <Input
                   placeholder="e.g. tsmc.com"
                   value={newSupplierDomain}
@@ -1373,7 +1350,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-semibold text-neutral-700">Category</label>
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Category</label>
                 <Input
                   placeholder="e.g. Semiconductors, Direct Materials"
                   value={newSupplierCategory}
@@ -1382,7 +1359,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                 />
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-neutral-700">Annual Contract Spend ($)</label>
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Annual Contract Spend ($)</label>
                 <Input
                   type="number"
                   placeholder="500000"
@@ -1395,7 +1372,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-semibold text-neutral-700">Tier (1-5)</label>
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Tier (1-5)</label>
                 <Input
                   type="number"
                   min={1}
@@ -1406,7 +1383,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                 />
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-neutral-700">Criticality (1-5)</label>
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Criticality (1-5)</label>
                 <Input
                   type="number"
                   min={1}
@@ -1426,7 +1403,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                 onChange={(e) => setNewSupplierSingleSource(e.target.checked)}
                 className="rounded border-neutral-300 text-[#FA651E] focus:ring-[#FA651E]"
               />
-              <label htmlFor="single-source-cb" className="text-xs font-medium text-neutral-700 cursor-pointer">
+              <label htmlFor="single-source-cb" className="text-xs font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer">
                 Flag as Single-Source Chokepoint (no alternative supplier)
               </label>
             </div>
@@ -1482,8 +1459,8 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               </div>
             ) : (
               <div className="space-y-2">
-                <label className="font-semibold text-neutral-700">Select Target Company</label>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto border border-neutral-200 rounded-xl p-1.5">
+                <label className="font-semibold text-neutral-700 dark:text-neutral-300">Select Target Company</label>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl p-1.5">
                   {companyList.map((comp) => (
                     <button
                       key={comp.id}
@@ -1493,7 +1470,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                         "w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors text-xs",
                         selectedCompanyId === comp.id
                           ? "bg-neutral-900 text-white font-medium"
-                          : "hover:bg-neutral-100 text-neutral-800"
+                          : "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200"
                       )}
                     >
                       <span>{comp.name}</span>

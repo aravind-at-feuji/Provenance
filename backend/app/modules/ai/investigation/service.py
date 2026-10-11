@@ -55,10 +55,59 @@ class InvestigationAgentService:
         trace_steps: list[InvestigationTraceStep] = []
         citations: list[InvestigationCitation] = []
 
-        # ── Step 1: Intent Extraction & Focus Identification ────────────────
+        # ── Step 1: Intent Extraction & Conversational Handling ────────────
         step1_start = time.perf_counter()
         query_text = request.query.strip()
         logger.info("investigation_agent_start", query=query_text, org_id=str(org_id))
+
+        # Check for simple conversational greetings or friendly pleasantries
+        GREETING_WORDS = {
+            "hello", "hi", "hey", "hello there", "hi there", "hey there", "hola",
+            "good morning", "good afternoon", "good evening", "how are you", "how are you doing",
+            "who are you", "what can you do", "help", "greetings", "sup", "yo", "thanks", "thank you"
+        }
+        normalized_query = query_text.lower().strip("?!., \t\n")
+        words = normalized_query.split()
+        is_greeting = normalized_query in GREETING_WORDS or (
+            normalized_query.startswith(("hello", "hi", "hey")) and len(words) <= 3
+        )
+
+        if is_greeting:
+            total_latency_ms = max(int((time.perf_counter() - start_time) * 1000), 8)
+            return InvestigationResponse(
+                query=query_text,
+                summary="Hello! Great to connect with you. I'm your Provenance supply chain copilot. How can I help you today?",
+                detailed_analysis=(
+                    "I'm here to help you monitor and navigate your supply chain with ease. "
+                    "You can ask me to evaluate risks for any supplier, enroll new suppliers, "
+                    "fetch live regulatory disruption feeds (like OFAC sanctions and export controls), "
+                    "or explore single-source chokepoints in your graph. What's on your mind?"
+                ),
+                risk_level="informational",
+                recommended_actions=[
+                    "Check exposure on active suppliers",
+                    "Add a new supplier node to catalog",
+                    "Fetch latest regulatory disruption signals",
+                ],
+                key_findings=[
+                    "System operational and monitoring tenant supply chain network",
+                    "Copilot ready for conversational inquiries and system actions",
+                ],
+                citations=[],
+                execution_trace=[
+                    InvestigationTraceStep(
+                        step_id="step_intent",
+                        name="Conversational Greeting Handshake",
+                        action="Identified friendly introductory dialogue",
+                        status="completed",
+                        details="Dispatched warm conversational welcome without heavy risk escalation",
+                        duration_ms=total_latency_ms,
+                    )
+                ],
+                model="Provenance Copilot",
+                provider="SYSTEM",
+                latency_ms=total_latency_ms,
+            )
 
         step1_duration = int((time.perf_counter() - step1_start) * 1000)
         trace_steps.append(
@@ -160,13 +209,16 @@ class InvestigationAgentService:
         # ── Step 4: LLM Synthesis with Gemini ──────────────────────────────
         step4_start = time.perf_counter()
         system_prompt = (
-            "You are Provenance's AI Investigation Agent (Agent 4) — an autonomous supply chain risk intelligence analyst. "
-            "Your role is to answer questions from Supply Chain Risk Managers and Category Managers with objective, cited reasoning. "
-            "STRICT RULES:\n"
-            "1. Ground all claims ONLY in the provided supplier graph context and external events.\n"
+            "You are Provenance's AI Investigation Agent (Agent 4) — an intelligent, friendly supply chain copilot. "
+            "TONE AND STYLE:\n"
+            "- Speak naturally, clearly, and warmly, like an experienced colleague having a conversation with a friend.\n"
+            "- Be concise and direct. Answer the specific question asked without burying the user in robotic jargon or alarmism.\n"
+            "- For casual, general, or exploratory inquiries, keep risk_level as 'informational' or 'low'. Only assign 'high' or 'critical' if the user's specific subject exhibits verifiable, acute disruptions in the provided context.\n"
+            "STRICT FACTUAL GROUNDING:\n"
+            "1. Ground all claims ONLY in the provided tenant supplier context and external events.\n"
             "2. Never hallucinate supplier names, countries, or risk scores.\n"
-            "3. If a specific data point is missing from the tenant context, state clearly what is known and what requires verification.\n"
-            "4. Provide actionable, practical mitigation steps (e.g., dual-sourcing, inventory buffer, tier-2 visibility audits).\n"
+            "3. If specific data is missing from the tenant context, explain simply what is known and what needs verification.\n"
+            "4. Provide practical, conversational recommendations (e.g., dual-sourcing, supplier outreach, inventory buffer).\n"
             "5. Return valid JSON adhering to the specified schema."
         )
 
