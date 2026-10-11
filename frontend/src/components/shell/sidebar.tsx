@@ -72,10 +72,10 @@ export function Sidebar() {
 
   const navItems: NavItem[] = [
     {
-      title: "Investigate",
-      href: "/investigate",
+      title: "Trace",
+      href: "/trace",
       icon: Sparkles,
-      badge: "AI",
+      badge: "Agent",
       badgeVariant: "ai",
     },
     {
@@ -176,7 +176,7 @@ export function Sidebar() {
                   ? "bg-neutral-100 text-neutral-950 font-semibold shadow-2xs border border-neutral-200/60"
                   : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-950 font-medium"
               )}
-              title={isCollapsed ? item.title : undefined}
+              title={isCollapsed ? (item.title === "Trace" ? "Agent Trace" : item.title) : undefined}
             >
               <Icon
                 className={cn(

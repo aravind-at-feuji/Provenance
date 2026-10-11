@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import { InvestigationWorkspace } from "@/components/investigate/investigation-workspace";
+import { AgentTraceWorkspace } from "@/components/investigate/agent-trace-workspace";
 
 export default function InvestigatePage(): React.JSX.Element {
   return (
     <div className="space-y-6">
-      <InvestigationWorkspace />
+      <AgentTraceWorkspace />
     </div>
   );
 }
