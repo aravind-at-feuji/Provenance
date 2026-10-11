@@ -72,6 +72,13 @@ export function Sidebar() {
 
   const navItems: NavItem[] = [
     {
+      title: "Investigate",
+      href: "/investigate",
+      icon: Sparkles,
+      badge: "AI",
+      badgeVariant: "ai",
+    },
+    {
       title: "Dashboard",
       href: "/dashboard",
       icon: Gauge,
@@ -99,13 +106,6 @@ export function Sidebar() {
       title: "Graph",
       href: "/graph",
       icon: Network,
-    },
-    {
-      title: "Investigate",
-      href: "/investigate",
-      icon: Sparkles,
-      badge: "AI",
-      badgeVariant: "ai",
     },
   ];
 

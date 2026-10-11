@@ -15,10 +15,20 @@ import {
   ExternalLink,
   Clock,
   Zap,
+  ArrowUp,
+  Paperclip,
+  Network,
+  Layers,
+  Scale,
+  FileText,
+  RotateCcw,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { useAutoResizeTextarea } from "@/components/ui/v0-ai-chat";
+import { cn } from "@/lib/utils";
 import { useUserStore } from "@/lib/store/user-store";
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
 
@@ -66,6 +76,37 @@ export interface SuggestionItem {
   icon: string;
 }
 
+const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
+  {
+    id: "sug-1",
+    title: "Single-Source Chokepoints",
+    prompt: "Identify all single-source supplier dependencies and sole-source tier-1 components in our supply network",
+    category: "concentration",
+    icon: "ShieldAlert",
+  },
+  {
+    id: "sug-2",
+    title: "Sanctions & OFAC Exposure",
+    prompt: "Scan our entire supplier catalog and corporate parentage against recent OFAC and EU sanctions designations",
+    category: "exposure",
+    icon: "Globe",
+  },
+  {
+    id: "sug-3",
+    title: "Critical Mineral Bottlenecks",
+    prompt: "Which suppliers have exposure to rare-earth and critical mineral export controls in East Asia?",
+    category: "deep_tier",
+    icon: "Cpu",
+  },
+  {
+    id: "sug-4",
+    title: "High-Spend Disruption Impact",
+    prompt: "What are our top highest-spend suppliers and their active regulatory disruption risk scores?",
+    category: "disruption",
+    icon: "AlertTriangle",
+  },
+];
+
 export function InvestigationWorkspace(): React.JSX.Element {
   const orgId = useUserStore((s) => s.orgId);
   const { getToken } = useAppAuth();
@@ -79,6 +120,11 @@ export function InvestigationWorkspace(): React.JSX.Element {
 
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
+  const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+    minHeight: 64,
+    maxHeight: 220,
+  });
+
   // Fetch dynamic tenant suggestions from live API
   useEffect(() => {
     async function loadSuggestions(): Promise<void> {
@@ -91,14 +137,16 @@ export function InvestigationWorkspace(): React.JSX.Element {
         const res = await fetch("/api/v1/investigate/suggestions", { credentials: "include", headers });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data)) {
+          if (Array.isArray(data) && data.length > 0) {
             setSuggestions(data);
+          } else {
+            setSuggestions(DEFAULT_SUGGESTIONS);
           }
         } else {
-          setSuggestions([]);
+          setSuggestions(DEFAULT_SUGGESTIONS);
         }
       } catch {
-        setSuggestions([]);
+        setSuggestions(DEFAULT_SUGGESTIONS);
       }
     }
     loadSuggestions();
@@ -135,6 +183,7 @@ export function InvestigationWorkspace(): React.JSX.Element {
           setCurrentResponse(data);
           setHistory((prev) => [data, ...prev]);
           setQuery("");
+          adjustHeight(true);
         } else {
           const errData = await res.json().catch(() => ({}));
           console.error("Investigation error:", errData);
@@ -147,8 +196,17 @@ export function InvestigationWorkspace(): React.JSX.Element {
         setIsLoading(false);
       }
     },
-    [isLoading, orgId, history, getToken]
+    [isLoading, orgId, history, getToken, adjustHeight]
   );
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (query.trim() && !isLoading) {
+        handleExecuteQuery(query);
+      }
+    }
+  };
 
   const getRiskBadgeVariant = (
     level: string
@@ -178,85 +236,151 @@ export function InvestigationWorkspace(): React.JSX.Element {
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+  const activeSuggestions = suggestions.length > 0 ? suggestions : DEFAULT_SUGGESTIONS;
 
-      {/* Query Bar & Suggestions */}
-      <Card className="p-4 bg-card/80 backdrop-blur-xl border border-border/80 shadow-md">
-        <div className="space-y-3">
-          {errorMessage && (
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
+  return (
+    <div className="space-y-8 max-w-5xl mx-auto">
+      {/* Hero Header Section */}
+      <div className="text-center space-y-3 pt-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700 text-xs font-semibold font-mono">
+          <Sparkles className="w-3.5 h-3.5 text-[#FA651E]" />
+          <span>AI Supply Chain Investigation</span>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
+          What risk can I help you investigate?
+        </h1>
+        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-xl mx-auto leading-relaxed">
+          Ask questions across your multi-tier supply chain, sanction notices, geopolitical bottlenecks, and real-time disruption feeds.
+        </p>
+      </div>
+
+      {/* Main AI Chat & Input Box */}
+      <div className="w-full space-y-4">
+        {errorMessage && (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-muted-foreground hover:text-foreground text-xs underline ml-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <div className="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 shadow-sm focus-within:ring-2 focus-within:ring-[#FA651E]/20 focus-within:border-[#FA651E] transition-all">
+          <div className="overflow-y-auto">
+            <Textarea
+              ref={textareaRef}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                adjustHeight();
+              }}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+              placeholder="Ask anything about your supply base (e.g. 'Which suppliers are exposed to Taiwan trade restrictions?')..."
+              className={cn(
+                "w-full px-4 py-3.5",
+                "resize-none",
+                "bg-transparent",
+                "border-none",
+                "text-neutral-900 dark:text-white text-sm",
+                "focus:outline-none",
+                "focus-visible:ring-0 focus-visible:ring-offset-0",
+                "placeholder:text-neutral-400 dark:placeholder:text-neutral-500 placeholder:text-sm",
+                "min-h-[64px]"
+              )}
+              style={{ overflow: "hidden" }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/60 dark:bg-neutral-900/40 rounded-b-2xl">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setErrorMessage(null)}
-                className="text-muted-foreground hover:text-foreground text-xs underline ml-2"
+                type="button"
+                onClick={() => {
+                  const prompt = "Identify all single-source supplier dependencies and sole-source tier-1 components";
+                  setQuery(prompt);
+                  handleExecuteQuery(prompt);
+                }}
+                className="group px-2.5 py-1.5 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 rounded-xl transition-colors flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                title="Trace single source chokepoints"
               >
-                Dismiss
+                <Network className="w-3.5 h-3.5 text-neutral-500" />
+                <span className="hidden sm:inline">Chokepoint Trace</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const prompt = "Scan our entire supplier catalog against recent OFAC, EU, and UK sanctions designations";
+                  setQuery(prompt);
+                  handleExecuteQuery(prompt);
+                }}
+                className="group px-2.5 py-1.5 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 rounded-xl transition-colors flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                title="Screen sanctions exposure"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-neutral-500" />
+                <span className="hidden sm:inline">Sanctions Screen</span>
               </button>
             </div>
-          )}
-          <div className="relative flex items-center">
-            <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Ask anything about your supply base (e.g. 'Which suppliers are exposed to Taiwan trade restrictions?')"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleExecuteQuery(query);
-                }
-              }}
-              disabled={isLoading}
-              className="w-full h-12 pl-10 pr-24 rounded-lg bg-background/90 border border-input text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-smooth"
-            />
-            <div className="absolute right-2">
+
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex px-2.5 py-1 rounded-lg text-xs font-mono text-neutral-500 border border-dashed border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-[#FA651E]" />
+                <span>Sonnet 3.5</span>
+              </div>
+
               <Button
-                size="sm"
+                type="button"
                 onClick={() => handleExecuteQuery(query)}
                 disabled={isLoading || !query.trim()}
-                className="h-8 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-medium gap-1.5 shadow-sm"
+                size="sm"
+                className={cn(
+                  "rounded-xl h-8 px-3.5 text-xs font-semibold gap-1.5 transition-all shadow-2xs",
+                  query.trim()
+                    ? "bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 cursor-pointer"
+                    : "bg-neutral-200 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600 cursor-not-allowed"
+                )}
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Analyzing...
+                    <span>Analyzing</span>
                   </>
                 ) : (
                   <>
                     <span>Investigate</span>
-                    <Send className="w-3 h-3" />
+                    <ArrowUp className="w-3.5 h-3.5" />
                   </>
                 )}
               </Button>
             </div>
           </div>
-
-          {/* Quick Investigation Prompt Chips */}
-          <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar">
-            <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Suggested:</span>
-            {suggestions.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setQuery(item.prompt);
-                  handleExecuteQuery(item.prompt);
-                }}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-muted/60 hover:bg-muted border border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground transition-smooth whitespace-nowrap shadow-xs"
-              >
-                {getCategoryIcon(item.icon)}
-                <span>{item.title}</span>
-              </button>
-            ))}
-          </div>
         </div>
-      </Card>
+
+        {/* Suggestion Action Pills */}
+        <div className="flex items-center justify-center gap-2.5 pt-1 flex-wrap">
+          {activeSuggestions.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                setQuery(item.prompt);
+                handleExecuteQuery(item.prompt);
+              }}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full border border-neutral-200/80 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors shadow-2xs text-xs font-medium"
+            >
+              {getCategoryIcon(item.icon)}
+              <span>{item.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Main Results Workspace */}
       {currentResponse ? (
