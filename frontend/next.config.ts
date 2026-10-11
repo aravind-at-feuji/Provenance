@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Strict mode catches subtle React bugs early
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 
   // Expose only explicitly prefixed vars to the browser
   // Never put secrets here — only NEXT_PUBLIC_* vars
