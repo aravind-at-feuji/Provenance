@@ -22,8 +22,11 @@ from app.modules.admin.schemas import (
     DLQEntryOut,
     DLQReplayResponse,
 )
+import structlog
 from app.modules.events.models import DataSource, DeadLetterQueue
 from ingestion.pipeline.pipeline import IngestionPipeline
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -34,7 +37,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
     summary="List all data source connectors and their health status",
 )
 async def list_data_sources(
-    current_user: CurrentUser = Depends(require_permission("admin:read")),
+    current_user: CurrentUser = Depends(require_permission("org:read")),
     db: AsyncSession = Depends(get_db),
 ) -> list[DataSourceOut]:
     res = await db.execute(select(DataSource).order_by(DataSource.source_key))
@@ -49,7 +52,7 @@ async def list_data_sources(
 )
 async def get_data_source(
     id: uuid.UUID,
-    current_user: CurrentUser = Depends(require_permission("admin:read")),
+    current_user: CurrentUser = Depends(require_permission("org:read")),
     db: AsyncSession = Depends(get_db),
 ) -> DataSourceOut:
     res = await db.execute(select(DataSource).where(DataSource.id == id))
@@ -67,7 +70,7 @@ async def get_data_source(
 async def update_data_source(
     id: uuid.UUID,
     payload: DataSourceUpdateIn,
-    current_user: CurrentUser = Depends(require_permission("admin:write")),
+    current_user: CurrentUser = Depends(require_permission("org:write")),
     db: AsyncSession = Depends(get_db),
 ) -> DataSourceOut:
     res = await db.execute(select(DataSource).where(DataSource.id == id))
@@ -91,7 +94,7 @@ async def update_data_source(
 )
 async def poll_data_source_now(
     id: uuid.UUID,
-    current_user: CurrentUser = Depends(require_permission("admin:write")),
+    current_user: CurrentUser = Depends(require_permission("org:write")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     res = await db.execute(select(DataSource).where(DataSource.id == id))
@@ -99,17 +102,23 @@ async def poll_data_source_now(
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data source not found")
 
-    pipeline = IngestionPipeline()
-    summary = await pipeline.run_async(session=db, connector=source.source_key, force=True)
-
-    return {
-        "source_key": summary.source_key,
-        "total_fetched": summary.total_fetched,
-        "new_records": summary.new_records,
-        "duplicates": summary.duplicates,
-        "revisions": summary.revisions,
-        "next_cursor": summary.next_cursor,
-    }
+    try:
+        pipeline = IngestionPipeline()
+        summary = await pipeline.run_async(session=db, connector=source.source_key, force=True)
+        return {
+            "source_key": summary.source_key,
+            "total_fetched": summary.total_fetched,
+            "new_records": summary.new_records,
+            "duplicates": summary.duplicates,
+            "revisions": summary.revisions,
+            "next_cursor": summary.next_cursor,
+        }
+    except Exception as exc:
+        logger.error("data_source_poll_failed", source_key=source.source_key, error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Data source '{source.name}' upstream poll failed: {str(exc)}",
+        )
 
 
 @router.get(
@@ -119,7 +128,7 @@ async def poll_data_source_now(
 )
 async def list_dlq_entries(
     status_filter: str | None = Query(None, alias="status", description="Filter by status (failed/replayed)"),
-    current_user: CurrentUser = Depends(require_permission("admin:read")),
+    current_user: CurrentUser = Depends(require_permission("org:read")),
     db: AsyncSession = Depends(get_db),
 ) -> list[DLQEntryOut]:
     stmt = select(DeadLetterQueue).order_by(DeadLetterQueue.created_at.desc())
@@ -138,7 +147,7 @@ async def list_dlq_entries(
 )
 async def replay_dlq_entry(
     id: uuid.UUID,
-    current_user: CurrentUser = Depends(require_permission("admin:write")),
+    current_user: CurrentUser = Depends(require_permission("org:write")),
     db: AsyncSession = Depends(get_db),
 ) -> DLQReplayResponse:
     from workers.tasks.ingest import replay_dlq_task

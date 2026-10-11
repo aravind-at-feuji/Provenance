@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <ClerkProviderWrapper>
       <html lang="en" suppressHydrationWarning>
-        <body className="min-h-screen bg-background font-sans antialiased">
+        <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>
           <QueryProvider>{children}</QueryProvider>
         </body>
       </html>

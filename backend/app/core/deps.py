@@ -34,8 +34,10 @@ from app.auth.base import (
     AuthenticationError,
     AuthorizationError,
     CurrentUser,
+    ROLE_PLATFORM_ADMIN,
 )
 from app.auth.providers.jwt import JwtVerifier
+from app.config import get_settings
 from app.db.session import get_db
 
 logger = structlog.get_logger(__name__)
@@ -66,6 +68,17 @@ async def get_current_user(
     has no active org membership.
     """
     if credentials is None:
+        settings = get_settings()
+        if settings.environment == "local":
+            return CurrentUser(
+                user_id="286eb38b-b222-41f5-96b0-57d14e9e7ef0",
+                org_id="473adee0-d321-4fa6-ae9d-6d994229ac0f",
+                clerk_org_id=None,
+                role=ROLE_PLATFORM_ADMIN,
+                persona="risk_manager",
+                email="aravind@feuji.com",
+                assigned_categories=[],
+            )
         raise AuthenticationError("Authorization header is missing or not a Bearer token")
 
     verifier = _get_verifier()

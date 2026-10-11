@@ -107,6 +107,7 @@ def create_app() -> FastAPI:
     from app.api.v1.investigate import router as investigate_router
     from app.api.v1.alerts import router as alerts_router
     from app.api.v1.events import router as events_router
+    from app.api.v1.risks import router as risks_router
 
     api_prefix = "/v1"
     application.include_router(health_router)
@@ -118,6 +119,7 @@ def create_app() -> FastAPI:
     application.include_router(investigate_router, prefix=api_prefix)
     application.include_router(alerts_router, prefix=api_prefix)
     application.include_router(events_router, prefix=api_prefix)
+    application.include_router(risks_router, prefix=api_prefix)
     application.include_router(suppliers_router, prefix=api_prefix)
     application.include_router(relationships_router, prefix=api_prefix)
     application.include_router(graph_router, prefix=api_prefix)

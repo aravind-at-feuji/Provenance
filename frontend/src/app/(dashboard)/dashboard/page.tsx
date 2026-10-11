@@ -4,10 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
-  Building2,
   DollarSign,
   Activity,
-  Sparkles,
   Layers,
   ChevronRight,
   Eye,
@@ -15,7 +13,8 @@ import {
   Globe,
   CheckCircle2,
   Gauge,
-  ArrowRight,
+  ShieldAlert,
+  Scale,
 } from "lucide-react";
 import { useUserStore } from "@/lib/store/user-store";
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
@@ -23,6 +22,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface SupplierItem {
   id: string;
@@ -51,16 +51,53 @@ interface ReviewItem {
   status: string;
 }
 
+interface RiskAssessmentItem {
+  id: string;
+  org_id: string;
+  event_id: string;
+  company_id: string;
+  impact_score: number;
+  severity_band: string;
+  confidence: number;
+  needs_human_judgment: boolean;
+  factors: {
+    event_severity?: number;
+    dependency_strength?: number;
+    evidence_quality?: number;
+    urgency_multiplier?: number;
+    exposure_multiplier?: number;
+    inputs?: Record<string, unknown>;
+  };
+  model_version: string;
+  computed_at: string;
+  company_name?: string | null;
+  event_summary?: string | null;
+  event_type?: string | null;
+}
+
+interface RiskSummaryData {
+  total_assessed: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  below_threshold_count: number;
+  average_impact_score: number;
+  needs_human_judgment_count: number;
+  top_risks: RiskAssessmentItem[];
+}
+
 export default function DashboardPage(): React.JSX.Element {
   const orgId = useUserStore((s) => s.orgId);
   const { getToken } = useAppAuth();
 
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
   const [pendingReviews, setPendingReviews] = useState<ReviewItem[]>([]);
+  const [riskSummary, setRiskSummary] = useState<RiskSummaryData | null>(null);
   const [healthStatus, setHealthStatus] = useState<string>("ok");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRecomputing, setIsRecomputing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [filterScope, setFilterScope] = useState<"all" | "tier1" | "subtier">("all");
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
@@ -95,6 +132,15 @@ export default function DashboardPage(): React.JSX.Element {
         const hData = await hRes.json();
         setHealthStatus(hData.status === "ok" ? "Operational" : "Degraded");
       }
+
+      // 4. Fetch live deterministic risk engine summary (Phase 11)
+      const riskRes = await fetch("/api/v1/risks/summary", { headers }).catch(() => null);
+      if (riskRes && riskRes.ok) {
+        const riskData = await riskRes.json();
+        setRiskSummary(riskData);
+      } else {
+        setRiskSummary(null);
+      }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to load dashboard intelligence");
     } finally {
@@ -105,6 +151,29 @@ export default function DashboardPage(): React.JSX.Element {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  const handleRecompute = async () => {
+    setIsRecomputing(true);
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (orgId) headers["x-org-id"] = orgId;
+
+      const res = await fetch("/api/v1/risks/recompute", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        await loadDashboardData();
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Recompute failed");
+    } finally {
+      setIsRecomputing(false);
+    }
+  };
 
   // Computed metrics from real database entities
   const computed = useMemo(() => {
@@ -141,17 +210,6 @@ export default function DashboardPage(): React.JSX.Element {
       countryBreakdown,
     };
   }, [suppliers]);
-
-  // Filtered suppliers based on segmented control
-  const filteredCriticalSuppliers = useMemo(() => {
-    if (filterScope === "tier1") {
-      return computed.criticalSuppliers.filter((s) => s.tier === 1);
-    }
-    if (filterScope === "subtier") {
-      return computed.criticalSuppliers.filter((s) => s.tier && s.tier > 1);
-    }
-    return computed.criticalSuppliers;
-  }, [computed.criticalSuppliers, filterScope]);
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500 max-w-7xl mx-auto pb-12">
@@ -206,6 +264,150 @@ export default function DashboardPage(): React.JSX.Element {
         />
       </div>
 
+      {/* ── Phase 11 Deterministic Risk Engine Telemetry & Factor Breakdown ── */}
+      <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-neutral-100 gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base text-neutral-950 font-bold">
+                Deterministic Risk Engine
+              </CardTitle>
+              <Badge variant="secondary" className="rounded-full px-2 text-[10px] font-mono uppercase bg-neutral-100 text-neutral-600">
+                Phase 11 · Multiplicative Formula
+              </Badge>
+            </div>
+            <CardDescription className="text-xs text-neutral-500 mt-1">
+              Deterministic mathematical scoring: Event Severity × Dependency × Evidence Quality × Urgency × Spend Exposure.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRecompute}
+              disabled={isRecomputing || isLoading}
+              className="rounded-xl border-neutral-200 text-xs shadow-2xs hover:bg-neutral-50"
+            >
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRecomputing && "animate-spin")} />
+              {isRecomputing ? "Recomputing..." : "Run Recompute Scan"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          {isLoading ? (
+            <div className="py-6 text-center text-xs text-neutral-400">
+              <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2 text-[#FA651E]" />
+              Querying risk model assessments...
+            </div>
+          ) : !riskSummary || riskSummary.total_assessed === 0 ? (
+            <div className="py-8 text-center text-neutral-500 space-y-2">
+              <Scale className="h-8 w-8 text-neutral-400 mx-auto" />
+              <p className="text-sm font-semibold text-neutral-900">No Risk Assessments Computed Yet</p>
+              <p className="text-xs max-w-md mx-auto text-neutral-500">
+                External regulatory events will intersect with your supplier topology to deterministically calculate exposure. Click Recompute to scan active events.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRecompute}
+                disabled={isRecomputing}
+                className="mt-2 rounded-xl border-neutral-200"
+              >
+                Trigger First Risk Calculation
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Summary Stats Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
+                <div className="rounded-xl bg-neutral-50 border border-neutral-200/60 p-3">
+                  <span className="text-[10px] uppercase font-mono text-neutral-500">Total Assessed</span>
+                  <p className="text-lg font-bold text-neutral-950 font-mono mt-0.5">{riskSummary.total_assessed}</p>
+                </div>
+                <div className="rounded-xl bg-neutral-50 border border-neutral-200/60 p-3">
+                  <span className="text-[10px] uppercase font-mono text-neutral-500">Avg Impact</span>
+                  <p className="text-lg font-bold text-[#FA651E] font-mono mt-0.5">{riskSummary.average_impact_score}</p>
+                </div>
+                <div className="rounded-xl bg-rose-50/60 border border-rose-200/60 p-3">
+                  <span className="text-[10px] uppercase font-mono text-rose-700">Critical (≥75)</span>
+                  <p className="text-lg font-bold text-rose-700 font-mono mt-0.5">{riskSummary.critical_count}</p>
+                </div>
+                <div className="rounded-xl bg-amber-50/60 border border-amber-200/60 p-3">
+                  <span className="text-[10px] uppercase font-mono text-amber-700">High (55–74)</span>
+                  <p className="text-lg font-bold text-amber-700 font-mono mt-0.5">{riskSummary.high_count}</p>
+                </div>
+                <div className="rounded-xl bg-blue-50/60 border border-blue-200/60 p-3">
+                  <span className="text-[10px] uppercase font-mono text-blue-700">Medium (35–54)</span>
+                  <p className="text-lg font-bold text-blue-700 font-mono mt-0.5">{riskSummary.medium_count}</p>
+                </div>
+                <div className="rounded-xl bg-neutral-50 border border-neutral-200/60 p-3">
+                  <span className="text-[10px] uppercase font-mono text-neutral-600">Low (&lt;35)</span>
+                  <p className="text-lg font-bold text-neutral-700 font-mono mt-0.5">{riskSummary.low_count}</p>
+                </div>
+              </div>
+
+              {/* Top Assessed Risks with Multiplicative Factor Breakdown */}
+              <div className="space-y-2.5 pt-2">
+                <span className="text-xs font-semibold text-neutral-700">Highest Exposure Risk Assessments</span>
+                {riskSummary.top_risks.map((risk) => (
+                  <div
+                    key={risk.id}
+                    className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-xl border border-neutral-200/70 bg-neutral-50/50 hover:bg-neutral-100/50 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            risk.severity_band === "CRITICAL"
+                              ? "critical"
+                              : risk.severity_band === "HIGH"
+                              ? "high"
+                              : "secondary"
+                          }
+                          className="text-[10px] font-mono px-2"
+                        >
+                          {risk.severity_band} · {risk.impact_score}
+                        </Badge>
+                        <span className="text-xs font-bold text-neutral-900">
+                          {risk.company_name || "Supplier Node"}
+                        </span>
+                        {risk.needs_human_judgment && (
+                          <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 bg-amber-50">
+                            Needs Human Judgment
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-neutral-600">
+                        {risk.event_summary || `Triggered by ${risk.event_type || "external signal"}`}
+                      </p>
+                    </div>
+
+                    {/* Factor Breakdown Chips */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-neutral-600">
+                      <span className="px-2 py-0.5 rounded bg-white border border-neutral-200" title="Event Severity">
+                        EvSev: {risk.factors.event_severity ?? "-"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-white border border-neutral-200" title="Dependency Strength">
+                        Dep: {risk.factors.dependency_strength ?? "-"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-white border border-neutral-200" title="Evidence Quality">
+                        Evi: {risk.factors.evidence_quality ?? "-"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-white border border-neutral-200" title="Urgency Multiplier">
+                        Urg: +{risk.factors.urgency_multiplier ?? "-"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-white border border-neutral-200" title="Exposure Multiplier">
+                        Exp: {risk.factors.exposure_multiplier ?? "-"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── High Exposure Critical Suppliers from Live Database ───────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Suppliers with Highest Risk Exposure */}
@@ -231,7 +433,7 @@ export default function DashboardPage(): React.JSX.Element {
                 <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-[#FA651E]" />
                 Loading live supplier risk telemetry...
               </div>
-            ) : filteredCriticalSuppliers.length === 0 ? (
+            ) : computed.criticalSuppliers.length === 0 ? (
               <div className="py-10 text-center text-neutral-500 space-y-2">
                 <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
                 <p className="text-sm font-semibold text-neutral-900">No Critical Exposures in View</p>
@@ -243,7 +445,7 @@ export default function DashboardPage(): React.JSX.Element {
                 </Button>
               </div>
             ) : (
-              filteredCriticalSuppliers.slice(0, 5).map((sup) => (
+              computed.criticalSuppliers.slice(0, 5).map((sup) => (
                 <div
                   key={sup.id}
                   className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-neutral-200/70 bg-neutral-50/50 p-3.5 transition-all hover:bg-neutral-100/60 hover:border-neutral-300"
@@ -297,13 +499,13 @@ export default function DashboardPage(): React.JSX.Element {
           </CardContent>
         </Card>
 
-        {/* Live Jurisdictional Exposure Radar */}
+        {/* Live Jurisdictional Exposure Radar & Review Queue */}
         <div className="space-y-6">
           <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs">
             <CardHeader className="pb-3 border-b border-neutral-100">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base text-neutral-950 font-bold">
-                  Jurisdictional Exposure &amp; Sourcing
+                  Jurisdictional Exposure
                 </CardTitle>
                 <Badge variant="secondary" className="capitalize text-[10px] rounded-full">
                   Live Registry
@@ -348,7 +550,7 @@ export default function DashboardPage(): React.JSX.Element {
             </CardContent>
           </Card>
 
-          {/* Quick Links & Review Queue */}
+          {/* Review Queue Card */}
           <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs">
             <CardHeader className="pb-2 border-b border-neutral-100">
               <CardTitle className="text-xs uppercase tracking-wider text-neutral-500 font-bold font-mono">
@@ -380,4 +582,3 @@ export default function DashboardPage(): React.JSX.Element {
     </div>
   );
 }
-

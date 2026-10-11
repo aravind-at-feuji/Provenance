@@ -26,16 +26,13 @@ class UKOFSIConnector(SourceConnector):
     source_type: str = "bulk_download"
     reliability: str = "high"
 
-    DEFAULT_CSV_URL = (
-        "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/"
-        "attachment_data/file/ConList.csv"
-    )
+    DEFAULT_CSV_URL = "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv"
 
     def __init__(self, download_url: str | None = None) -> None:
         self.download_url = download_url or self.DEFAULT_CSV_URL
 
     async def fetch(self, cursor: str | None = None) -> FetchResult:
-        """Downloads and parses UK OFSI consolidated CSV."""
+        """Downloads and parses UK OFSI / UK Sanctions List consolidated CSV."""
         headers = {"User-Agent": "Provenance/1.0 (supply-chain-risk)"}
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             resp = await client.get(self.download_url, headers=headers)
@@ -50,8 +47,17 @@ class UKOFSIConnector(SourceConnector):
         )
 
     def parse_csv(self, csv_content: str) -> list[dict[str, Any]]:
-        """Parses UK OFSI CSV into row dictionaries."""
-        reader = csv.DictReader(io.StringIO(csv_content))
+        """Parses UK OFSI / UK Sanctions List CSV into row dictionaries."""
+        lines = csv_content.splitlines()
+        # Skip preamble lines (e.g. 'Report Date: ...') until the actual CSV header
+        start_idx = 0
+        for i, line in enumerate(lines[:10]):
+            if any(k in line for k in ("Name 6", "Last Updated", "Unique ID", "Group ID", "OFSI Group ID")):
+                start_idx = i
+                break
+        clean_content = "\n".join(lines[start_idx:])
+
+        reader = csv.DictReader(io.StringIO(clean_content))
         items: list[dict[str, Any]] = []
 
         for row in reader:
@@ -66,12 +72,31 @@ class UKOFSIConnector(SourceConnector):
             ]
             full_name = " ".join(p for p in name_parts if p).strip()
 
-            group_id = (row.get("Group ID") or "").strip()
-            group_type = (row.get("Group Type") or "Entity").strip()
-            regime = (row.get("Regime") or "").strip()
-            last_updated = (row.get("Last Updated") or "").strip()
-            country = (row.get("Country") or "").strip()
-            other_info = (row.get("Other Information") or "").strip()
+            group_id = (
+                row.get("Group ID")
+                or row.get("OFSI Group ID")
+                or row.get("Unique ID")
+                or ""
+            ).strip()
+            group_type = (
+                row.get("Group Type")
+                or row.get("Designation Type")
+                or row.get("Type of entity")
+                or "Entity"
+            ).strip()
+            regime = (row.get("Regime") or row.get("Regime Name") or "").strip()
+            last_updated = (row.get("Last Updated") or row.get("Date Designated") or "").strip()
+            country = (
+                row.get("Country")
+                or row.get("Address Country")
+                or row.get("Country of birth")
+                or ""
+            ).strip()
+            other_info = (
+                row.get("Other Information")
+                or row.get("UK Statement of Reasons")
+                or ""
+            ).strip()
 
             if full_name or group_id:
                 items.append(

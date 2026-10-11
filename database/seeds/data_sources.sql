@@ -163,7 +163,7 @@ INSERT INTO data_sources (
     'uk_ofsi',
     'UK OFSI Sanctions List',
     'bulk_download',
-    'https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file',
+    'https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv',
     'none',
     'high',
     'Open Government Licence v3.0 — free to use and adapt with attribution. See https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/',
