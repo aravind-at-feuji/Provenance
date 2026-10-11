@@ -39,3 +39,10 @@ Before starting, follow the core's "Two Usage Modes" section: explicit session i
 - This rule applies across all frontend code (`frontend/src/**`), backend application logic (`backend/app/**`), workers, and ingestion pipelines.
 - Only automated unit/integration tests running under pytest/vitest may use isolated test mocks; all runtime application code must remain 100% free of dummy and mock datasets.
 
+---
+
+## 🚫 MANDATORY RULE: NO "9 REGULATORY FEEDS LIVE" OR FEED/SOURCE COUNT BADGES IN UI
+- **NEVER** introduce badges, pills, or status chips such as `"9 REGULATORY FEEDS LIVE"`, `"9 Sources Active"`, `"LIVE REGULATORY INGESTION ACTIVE"`, `"SYSTEM OPERATIONAL · 9 FEEDS SYNCHRONIZED"`, `"9 Live Feeds"`, or any artificial feed/source count badges across the UI in any pages.
+- This rule applies across **ALL** pages throughout the entire application: landing page, app shell headers, navigation bars, sidebars, dashboard overviews, footers, modals, preview cards, and widgets.
+- Headers, navigation bars, and footers must remain clean, professional, and free from artificial live-feed indicators or pulsing count chips.
+

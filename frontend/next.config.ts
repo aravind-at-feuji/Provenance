@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000",
   },
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "framerusercontent.com",
+      },
+    ],
+  },
+
   // Rewrites proxy /api/v1/* to the FastAPI backend during local dev,
   // so the browser never makes cross-origin requests in dev.
   async rewrites() {

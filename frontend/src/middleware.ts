@@ -4,6 +4,7 @@ import { isClerkConfigured } from "@/lib/auth/clerk-config";
 
 // Routes that do NOT require authentication
 const isPublicRoute = createRouteMatcher([
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/v1/health(.*)",

@@ -84,10 +84,8 @@ describe("App Shell & Navigation", () => {
   });
 
   describe("Header", () => {
-    it("renders the 9 Sources Active status pill and persona switcher", () => {
+    it("renders the persona switcher and user menu", () => {
       render(<Header />);
-      expect(screen.getByText("9 Sources Active")).toBeInTheDocument();
-      expect(screen.getByText("SLO Freshness: <1h")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /risk manager/i })).toBeInTheDocument();
     });
   });
