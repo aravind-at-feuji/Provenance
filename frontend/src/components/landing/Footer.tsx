@@ -37,8 +37,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/data" className="hover:text-neutral-950 transition-colors">
-                  Spend Intelligence
+                <Link href="/suppliers" className="hover:text-neutral-950 transition-colors">
+                  Supply Chain Network
                 </Link>
               </li>
               <li>

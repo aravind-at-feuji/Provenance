@@ -10,7 +10,6 @@ import {
   Sparkles,
   Building2,
   AlertTriangle,
-  LineChart,
   Settings,
   ShieldCheck,
   ChevronLeft,
@@ -107,11 +106,6 @@ export function Sidebar() {
       icon: Sparkles,
       badge: "AI",
       badgeVariant: "ai",
-    },
-    {
-      title: "Data",
-      href: "/data",
-      icon: LineChart,
     },
   ];
 
