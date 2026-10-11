@@ -191,7 +191,6 @@ describe("Phase 7 — Supply Chain Graph Visualizer", () => {
     render(<GraphPage />);
 
     expect(screen.getByText("Supply Chain Graph Visualizer")).toBeInTheDocument();
-    expect(screen.getByText("Phase 7 Topology Engine")).toBeInTheDocument();
 
     // Check metric cards
     expect(screen.getByText("Total Entities")).toBeInTheDocument();

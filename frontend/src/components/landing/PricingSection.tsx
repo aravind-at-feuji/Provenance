@@ -11,7 +11,7 @@ export function PricingSection() {
     "Continuous ingestion across official Tier-1 regulatory registers",
     "GLEIF Level-2 entity resolution with parent/subsidiary cascade",
     "Deterministic dollar exposure scoring without AI hallucinations",
-    "Role-scoped dashboards for Risk Managers & Category Managers",
+    "Executive risk intelligence & supplier spend visibility",
     "Full evidence chains with verifiable legal gazette citations",
     "30-day retroactive disruption backfill on onboarding",
   ];

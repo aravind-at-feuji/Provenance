@@ -14,8 +14,9 @@ import {
   RefreshCw,
   Globe,
   CheckCircle2,
+  Gauge,
+  ArrowRight,
 } from "lucide-react";
-import { useUIStore } from "@/lib/store/ui-store";
 import { useUserStore } from "@/lib/store/user-store";
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -51,7 +52,6 @@ interface ReviewItem {
 }
 
 export default function DashboardPage(): React.JSX.Element {
-  const persona = useUIStore((s) => s.persona);
   const orgId = useUserStore((s) => s.orgId);
   const { getToken } = useAppAuth();
 
@@ -60,6 +60,7 @@ export default function DashboardPage(): React.JSX.Element {
   const [healthStatus, setHealthStatus] = useState<string>("ok");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [filterScope, setFilterScope] = useState<"all" | "tier1" | "subtier">("all");
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
@@ -141,51 +142,28 @@ export default function DashboardPage(): React.JSX.Element {
     };
   }, [suppliers]);
 
-  return (
-    <div className="space-y-8 animate-in fade-in-50 duration-500">
-      {/* ── Page Header & Persona Context Banner ─────────────────────── */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
-            {persona === "risk_manager"
-              ? "Supply Chain Risk Intelligence"
-              : "Category Procurement & Sourcing"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {persona === "risk_manager"
-              ? "External disruption signals mapped deterministically across multi-tier supplier nodes."
-              : "Category exposure, should-cost leakage findings, and supplier diversification actions."}
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Button variant="outline" size="sm" onClick={() => loadDashboardData()} disabled={isLoading}>
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/suppliers">
-              <Building2 className="mr-1.5 h-3.5 w-3.5" />
-              Manage Suppliers
-            </Link>
-          </Button>
-          <Button asChild variant="glow" size="sm">
-            <Link href="/investigate">
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              Ask Investigation Agent
-            </Link>
-          </Button>
-        </div>
-      </div>
+  // Filtered suppliers based on segmented control
+  const filteredCriticalSuppliers = useMemo(() => {
+    if (filterScope === "tier1") {
+      return computed.criticalSuppliers.filter((s) => s.tier === 1);
+    }
+    if (filterScope === "subtier") {
+      return computed.criticalSuppliers.filter((s) => s.tier && s.tier > 1);
+    }
+    return computed.criticalSuppliers;
+  }, [computed.criticalSuppliers, filterScope]);
 
+  return (
+    <div className="space-y-8 animate-in fade-in-50 duration-500 max-w-7xl mx-auto pb-12">
       {errorMsg && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>{errorMsg}</span>
           </div>
           <button
             onClick={() => setErrorMsg(null)}
-            className="text-muted-foreground hover:text-foreground text-xs underline ml-2"
+            className="text-neutral-500 hover:text-neutral-800 text-xs underline ml-2"
           >
             Dismiss
           </button>
@@ -198,8 +176,9 @@ export default function DashboardPage(): React.JSX.Element {
           title="Monitored Suppliers"
           value={isLoading ? "..." : String(computed.totalSuppliers)}
           subtitle={`${computed.tier1Count} Tier-1 · ${computed.subTierCount} Sub-tier`}
-          icon={<Building2 className="h-4 w-4" />}
+          icon={<Gauge className="h-4 w-4" />}
           accent="blue"
+          className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs hover:shadow-sm"
         />
         <MetricCard
           title="High Criticality Nodes"
@@ -207,6 +186,7 @@ export default function DashboardPage(): React.JSX.Element {
           subtitle={`${computed.singleSourceCount} single-source dependencies`}
           icon={<AlertTriangle className="h-4 w-4" />}
           accent="critical"
+          className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs hover:shadow-sm"
         />
         <MetricCard
           title="Total Contract Spend"
@@ -214,6 +194,7 @@ export default function DashboardPage(): React.JSX.Element {
           subtitle={`Across ${computed.countryBreakdown.length} jurisdictions`}
           icon={<DollarSign className="h-4 w-4" />}
           accent="high"
+          className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs hover:shadow-sm"
         />
         <MetricCard
           title="Pending Entity Reviews"
@@ -221,76 +202,79 @@ export default function DashboardPage(): React.JSX.Element {
           subtitle={healthStatus === "Operational" ? "Backend Services Healthy" : "System Degraded"}
           icon={<Activity className="h-4 w-4" />}
           accent="emerald"
+          className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs hover:shadow-sm"
         />
       </div>
 
       {/* ── High Exposure Critical Suppliers from Live Database ───────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Suppliers with Highest Risk Exposure */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <Card className="lg:col-span-2 rounded-2xl border-neutral-200/80 bg-white shadow-2xs">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-neutral-100">
             <div>
-              <CardTitle className="text-base">High-Exposure Supplier Registry</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-base text-neutral-950 font-bold">
+                High-Exposure Supplier Registry
+              </CardTitle>
+              <CardDescription className="text-xs text-neutral-500">
                 Tier-1 and Tier-2 suppliers with Criticality 4 or 5 requiring proactive risk monitoring.
               </CardDescription>
             </div>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="rounded-lg text-neutral-600 hover:text-neutral-900">
               <Link href="/suppliers" className="text-xs">
                 View all ({computed.totalSuppliers}) <ChevronRight className="ml-1 h-3 w-3" />
               </Link>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 pt-4">
             {isLoading ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">
-                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+              <div className="py-8 text-center text-xs text-neutral-400">
+                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-[#FA651E]" />
                 Loading live supplier risk telemetry...
               </div>
-            ) : computed.criticalSuppliers.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground space-y-2">
+            ) : filteredCriticalSuppliers.length === 0 ? (
+              <div className="py-10 text-center text-neutral-500 space-y-2">
                 <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
-                <p className="text-sm font-medium text-foreground">No High-Criticality Exposures</p>
-                <p className="text-xs max-w-sm mx-auto">
+                <p className="text-sm font-semibold text-neutral-900">No Critical Exposures in View</p>
+                <p className="text-xs max-w-sm mx-auto text-neutral-500">
                   All active suppliers in your registry are currently classified below Criticality 4, or no suppliers have been registered yet.
                 </p>
-                <Button asChild size="sm" variant="outline" className="mt-3">
+                <Button asChild size="sm" variant="outline" className="mt-3 rounded-xl border-neutral-200">
                   <Link href="/suppliers">Add Suppliers to Registry</Link>
                 </Button>
               </div>
             ) : (
-              computed.criticalSuppliers.slice(0, 5).map((sup) => (
+              filteredCriticalSuppliers.slice(0, 5).map((sup) => (
                 <div
                   key={sup.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 p-3.5 transition-all hover:bg-muted/70 hover:border-border"
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-neutral-200/70 bg-neutral-50/50 p-3.5 transition-all hover:bg-neutral-100/60 hover:border-neutral-300"
                 >
                   <div className="space-y-1.5 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="critical">
+                      <Badge variant="critical" className="rounded-full px-2 text-[10px]">
                         CRITICALITY {sup.criticality}/5
                       </Badge>
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="rounded-full px-2 text-[10px] bg-neutral-200/80">
                         TIER {sup.tier ?? 1}
                       </Badge>
                       {sup.single_source && (
-                        <Badge variant="outline" className="border-destructive/40 text-destructive text-[10px]">
+                        <Badge variant="outline" className="rounded-full px-2 text-[10px] border-rose-300 text-rose-600 bg-rose-50">
                           SINGLE SOURCE
                         </Badge>
                       )}
-                      <span className="text-[11px] font-mono text-muted-foreground">
+                      <span className="text-[11px] font-mono text-neutral-500">
                         {sup.company.country || "Global"}
                       </span>
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                    <h3 className="text-sm font-bold text-neutral-900 group-hover:text-[#FA651E] transition-colors">
                       {sup.company.legal_name}
                     </h3>
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-500">
                       <span>
-                        Category: <strong className="text-foreground">{sup.category || "Unassigned"}</strong>
+                        Category: <strong className="text-neutral-800">{sup.category || "Unassigned"}</strong>
                       </span>
                       {sup.annual_spend_usd !== null && sup.annual_spend_usd > 0 && (
                         <span>
-                          Spend: <strong className="text-foreground">${sup.annual_spend_usd.toLocaleString()}</strong>
+                          Spend: <strong className="text-neutral-800">${sup.annual_spend_usd.toLocaleString()}</strong>
                         </span>
                       )}
                       <span className="text-[11px]">
@@ -300,7 +284,7 @@ export default function DashboardPage(): React.JSX.Element {
                   </div>
 
                   <div className="flex items-center gap-1.5 self-end sm:self-center">
-                    <Button asChild variant="outline" size="sm">
+                    <Button asChild variant="outline" size="sm" className="rounded-xl border-neutral-200 bg-white hover:bg-neutral-50 shadow-2xs">
                       <Link href={`/suppliers?search=${encodeURIComponent(sup.company.legal_name)}`}>
                         <Eye className="mr-1.5 h-3.5 w-3.5" />
                         View Dossier
@@ -315,40 +299,38 @@ export default function DashboardPage(): React.JSX.Element {
 
         {/* Live Jurisdictional Exposure Radar */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
+          <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs">
+            <CardHeader className="pb-3 border-b border-neutral-100">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  {persona === "risk_manager"
-                    ? "Jurisdictional Exposure"
-                    : "Sourcing Distribution"}
+                <CardTitle className="text-base text-neutral-950 font-bold">
+                  Jurisdictional Exposure &amp; Sourcing
                 </CardTitle>
-                <Badge variant="secondary" className="capitalize text-[10px]">
+                <Badge variant="secondary" className="capitalize text-[10px] rounded-full">
                   Live Registry
                 </Badge>
               </div>
-              <CardDescription>
+              <CardDescription className="text-xs text-neutral-500">
                 Geographic concentration across registered suppliers.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3.5 text-xs">
+            <CardContent className="space-y-3.5 pt-4 text-xs">
               {computed.countryBreakdown.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground">
-                  <Globe className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                <div className="py-6 text-center text-neutral-400">
+                  <Globe className="h-6 w-6 mx-auto mb-2 text-neutral-400" />
                   <p className="text-xs">No supplier jurisdictions mapped yet.</p>
                 </div>
               ) : (
                 computed.countryBreakdown.slice(0, 4).map((item) => (
                   <div key={item.country} className="space-y-1.5">
-                    <div className="flex justify-between font-medium">
+                    <div className="flex justify-between font-medium text-neutral-700">
                       <span>Jurisdiction: {item.country}</span>
-                      <span className="font-mono text-primary font-semibold">
+                      <span className="font-mono text-[#FA651E] font-semibold">
                         {item.percentage}% ({item.count} suppliers)
                       </span>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div className="h-1.5 w-full rounded-full bg-neutral-100 overflow-hidden">
                       <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-[#FA651E] to-[#E03368] rounded-full transition-all duration-500"
                         style={{ width: `${Math.max(item.percentage, 4)}%` }}
                       />
                     </div>
@@ -356,7 +338,7 @@ export default function DashboardPage(): React.JSX.Element {
                 ))
               )}
               <div className="pt-2">
-                <Button asChild variant="outline" size="sm" className="w-full">
+                <Button asChild variant="outline" size="sm" className="w-full rounded-xl border-neutral-200 bg-white hover:bg-neutral-50 shadow-2xs">
                   <Link href="/graph">
                     <Layers className="mr-1.5 h-3.5 w-3.5" />
                     Explore Network Topology
@@ -367,25 +349,25 @@ export default function DashboardPage(): React.JSX.Element {
           </Card>
 
           {/* Quick Links & Review Queue */}
-          <Card className="border-border/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
+          <Card className="rounded-2xl border-neutral-200/80 bg-white shadow-2xs">
+            <CardHeader className="pb-2 border-b border-neutral-100">
+              <CardTitle className="text-xs uppercase tracking-wider text-neutral-500 font-bold font-mono">
                 Action Items &amp; Review Queue
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between items-center py-1.5 border-b border-border/40">
-                <span className="text-muted-foreground">Pending Entity Matches</span>
-                <Badge variant={pendingReviews.length > 0 ? "high" : "secondary"}>
+            <CardContent className="space-y-2 pt-3 text-xs">
+              <div className="flex justify-between items-center py-1.5 border-b border-neutral-100">
+                <span className="text-neutral-600">Pending Entity Matches</span>
+                <Badge variant={pendingReviews.length > 0 ? "high" : "secondary"} className="rounded-full px-2">
                   {pendingReviews.length} to review
                 </Badge>
               </div>
-              <div className="flex justify-between items-center py-1.5 border-b border-border/40">
-                <span className="text-muted-foreground">Single-Source Points</span>
-                <span className="font-semibold text-foreground">{computed.singleSourceCount} suppliers</span>
+              <div className="flex justify-between items-center py-1.5 border-b border-neutral-100">
+                <span className="text-neutral-600">Single-Source Points</span>
+                <span className="font-semibold text-neutral-900">{computed.singleSourceCount} suppliers</span>
               </div>
               <div className="pt-2">
-                <Button asChild variant="default" size="sm" className="w-full text-xs">
+                <Button asChild variant="default" size="sm" className="w-full text-xs rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white shadow-2xs">
                   <Link href="/suppliers/reviews">
                     Resolve Entity Matches ({pendingReviews.length})
                   </Link>
@@ -398,3 +380,4 @@ export default function DashboardPage(): React.JSX.Element {
     </div>
   );
 }
+

@@ -242,9 +242,6 @@ export default function GraphPage(): React.JSX.Element {
             <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
               Supply Chain Graph Visualizer
             </h1>
-            <Badge variant="outline" className="font-mono text-xs bg-primary/10 text-primary border-primary/20">
-              Phase 7 Topology Engine
-            </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Interactive multi-tier network graph showing direct suppliers, sub-tier dependencies, and ownership links.
@@ -394,11 +391,10 @@ export default function GraphPage(): React.JSX.Element {
                 <button
                   key={l}
                   onClick={() => setLayoutName(l)}
-                  className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
-                    layoutName === l
+                  className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${layoutName === l
                       ? "bg-purple-600 text-white shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {l === "dagre" ? "Hierarchy (Dagre)" : l === "cose-bilkent" ? "Clusters (Cose)" : "Radial"}
                 </button>

@@ -180,39 +180,6 @@ export function InvestigationWorkspace(): React.JSX.Element {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Top Banner & AI Engine Metadata */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-primary/10 via-background to-secondary/10 border border-primary/20 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <Sparkles className="h-5 w-5 animate-pulse" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold tracking-tight text-foreground">
-                Provenance Agentic Investigation Engine
-              </h2>
-              <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30 font-mono">
-                Gemini 1.5 Flash
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Autonomous evidence gathering, multi-tier graph traversal, and zero vendor lock-in AI verification.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-          <span className="flex items-center gap-1">
-            <Zap className="w-3 h-3 text-emerald-500" />
-            RLS Tenant Scoped
-          </span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-primary" />
-            Live Trace Engine
-          </span>
-        </div>
-      </div>
 
       {/* Query Bar & Suggestions */}
       <Card className="p-4 bg-card/80 backdrop-blur-xl border border-border/80 shadow-md">
@@ -320,8 +287,8 @@ export function InvestigationWorkspace(): React.JSX.Element {
                   type="button"
                   onClick={() => setActiveTab("analysis")}
                   className={`px-3 py-1 rounded text-xs font-medium transition-smooth ${activeTab === "analysis"
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   Analysis & Findings
@@ -330,8 +297,8 @@ export function InvestigationWorkspace(): React.JSX.Element {
                   type="button"
                   onClick={() => setActiveTab("citations")}
                   className={`px-3 py-1 rounded text-xs font-medium transition-smooth ${activeTab === "citations"
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   Evidence Citations ({currentResponse.citations.length})
@@ -340,8 +307,8 @@ export function InvestigationWorkspace(): React.JSX.Element {
                   type="button"
                   onClick={() => setActiveTab("trace")}
                   className={`px-3 py-1 rounded text-xs font-medium transition-smooth ${activeTab === "trace"
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   Execution Trace ({currentResponse.execution_trace.length})

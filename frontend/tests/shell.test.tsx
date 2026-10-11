@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Sidebar } from "@/components/shell/sidebar";
-import { Header } from "@/components/shell/header";
-import { PersonaSwitcher } from "@/components/shell/persona-switcher";
 import { useUIStore } from "@/lib/store/ui-store";
 import { useUserStore } from "@/lib/store/user-store";
 
@@ -64,29 +62,10 @@ describe("App Shell & Navigation", () => {
       fireEvent.click(collapseBtn);
       expect(useUIStore.getState().isSidebarCollapsed).toBe(true);
     });
-  });
 
-  describe("PersonaSwitcher", () => {
-    it("renders both personas and switches active persona", () => {
-      render(<PersonaSwitcher />);
-      const riskBtn = screen.getByRole("button", { name: /risk manager/i });
-      const categoryBtn = screen.getByRole("button", { name: /category manager/i });
-
-      expect(riskBtn).toBeInTheDocument();
-      expect(categoryBtn).toBeInTheDocument();
-
-      fireEvent.click(categoryBtn);
-      expect(useUIStore.getState().persona).toBe("category_manager");
-
-      fireEvent.click(riskBtn);
-      expect(useUIStore.getState().persona).toBe("risk_manager");
-    });
-  });
-
-  describe("Header", () => {
-    it("renders the persona switcher and user menu", () => {
-      render(<Header />);
-      expect(screen.getByRole("button", { name: /risk manager/i })).toBeInTheDocument();
+    it("renders the user menu at the bottom of sidebar", () => {
+      render(<Sidebar />);
+      expect(screen.getByText("risk.manager")).toBeInTheDocument();
     });
   });
 });

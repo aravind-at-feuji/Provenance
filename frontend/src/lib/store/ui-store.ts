@@ -1,10 +1,8 @@
 /**
- * src/lib/store/ui-store.ts — UI state for navigation, persona selection, and theme.
+ * src/lib/store/ui-store.ts — UI state for navigation and shell controls.
  *
  * Manages:
- *   1. Active persona: "risk_manager" | "category_manager"
- *      - Risk Manager: Focuses on external geopolitical/regulatory signals and exposure paths.
- *      - Category Manager: Focuses on categories, supplier spend, and action plans.
+ *   1. Active persona: Unified executive risk intelligence workspace.
  *   2. Sidebar collapsed state.
  *   3. Command palette open state.
  */

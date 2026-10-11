@@ -29,7 +29,7 @@ export function TrustBar() {
             <span>BUILT FOR COMPLEX GLOBAL SUPPLY NETWORKS</span>
           </div>
           <p className="text-xs sm:text-sm text-neutral-600 max-w-xl mx-auto">
-            Trusted by risk leaders and category managers across aerospace, automotive, semiconductors, and industrial manufacturing.
+            Trusted by supply chain risk leaders and procurement teams across aerospace, automotive, semiconductors, and industrial manufacturing.
           </p>
         </div>
 

@@ -309,7 +309,7 @@ export default function SettingsPage() {
               <div>
                 <CardTitle className="text-base font-semibold">Team Members & Role Access</CardTitle>
                 <CardDescription className="text-xs">
-                  Manage organization access, assign personas (Risk Manager / Category Manager), and scope permissions.
+                  Manage organization access, team member privileges, and scope permissions.
                 </CardDescription>
               </div>
               <Button size="sm" onClick={() => setIsInviteModalOpen(true)} className="gap-1.5 text-xs">
@@ -479,14 +479,14 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-muted-foreground font-medium">Default Persona View</label>
+              <label className="text-muted-foreground font-medium">Access Level</label>
               <select
                 value={newMemberPersona}
                 onChange={(e) => setNewMemberPersona(e.target.value)}
                 className="w-full h-9 rounded-md border border-input bg-card/80 px-3 text-xs text-foreground"
               >
-                <option value="risk_manager">Risk Manager (Geopolitical & Regulatory)</option>
-                <option value="category_manager">Category Manager (Spend & Sourcing)</option>
+                <option value="risk_manager">Analyst (Full Access)</option>
+                <option value="category_manager">Reviewer (Standard Access)</option>
               </select>
             </div>
           </div>

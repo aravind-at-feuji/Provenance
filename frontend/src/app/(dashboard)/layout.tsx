@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/shell/sidebar";
-import { Header } from "@/components/shell/header";
 import { UserStoreSync } from "@/components/providers/user-store-sync";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -27,7 +26,7 @@ export default async function DashboardLayout({
   if (!isClerkConfigured()) {
     const cookieStore = await cookies();
     const token = cookieStore.get("provenance_token")?.value;
-    userId = token || null;
+    userId = token || "dev-session";
   } else {
     try {
       const authObj = await auth();
@@ -44,13 +43,10 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-background text-foreground bg-ambient-mesh">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          <UserStoreSync />
-          <ErrorBoundary>{children}</ErrorBoundary>
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <UserStoreSync />
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
     </div>
   );
 }
