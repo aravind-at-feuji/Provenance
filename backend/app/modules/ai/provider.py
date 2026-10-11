@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -73,6 +74,7 @@ class BaseAIProvider(abc.ABC):
         texts: list[str],
         *,
         model: str | None = None,
+        dimensions: int = 1024,
     ) -> list[list[float]]:
         """Optional embedding generation."""
         raise NotImplementedError(f"{self.name} does not implement generate_embeddings")
@@ -295,6 +297,42 @@ class GeminiProvider(BaseAIProvider):
         except Exception as exc:
             raise AIProviderError(f"Failed to parse structured Gemini output: {exc}", details=data) from exc
 
+    async def generate_embeddings(
+        self,
+        texts: list[str],
+        *,
+        model: str | None = None,
+        dimensions: int = 768,
+    ) -> list[list[float]]:
+        target_model = model or "text-embedding-004"
+        if not self.api_key:
+            results = []
+            for t in texts:
+                h = hashlib.sha256(t.encode("utf-8")).digest()
+                vec = [float((h[i % len(h)] + (i * 17) % 256) - 128) / 128.0 for i in range(dimensions)]
+                norm = (sum(x * x for x in vec) ** 0.5) or 1.0
+                results.append([x / norm for x in vec])
+            return results
+
+        endpoint = f"{self.base_url}/v1beta/models/{target_model}:embedContent"
+        params = {"key": self.api_key}
+        headers = {"Content-Type": "application/json"}
+        results = []
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for text in texts:
+                payload = {
+                    "model": f"models/{target_model}",
+                    "content": {"parts": [{"text": text}]},
+                }
+                resp = await client.post(endpoint, params=params, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    vec = data.get("embedding", {}).get("values", [])
+                    results.append(vec)
+                else:
+                    raise AIProviderError(f"Gemini embedding error {resp.status_code}: {resp.text}", status_code=resp.status_code)
+        return results
+
 
 class ClaudeProvider(BaseAIProvider):
     """
@@ -375,6 +413,22 @@ class ClaudeProvider(BaseAIProvider):
         clean = re.sub(r"\s*```$", "", clean).strip()
         parsed = json.loads(clean)
         return schema.model_validate(parsed)
+
+    async def generate_embeddings(
+        self,
+        texts: list[str],
+        *,
+        model: str | None = None,
+        dimensions: int = 1024,
+    ) -> list[list[float]]:
+        # Anthropic Messages API does not offer native embeddings; fallback to deterministic hash vector
+        results = []
+        for t in texts:
+            h = hashlib.sha256(t.encode("utf-8")).digest()
+            vec = [float((h[i % len(h)] + (i * 17) % 256) - 128) / 128.0 for i in range(dimensions)]
+            norm = (sum(x * x for x in vec) ** 0.5) or 1.0
+            results.append([x / norm for x in vec])
+        return results
 
 
 class OpenAIProvider(BaseAIProvider):
@@ -459,6 +513,35 @@ class OpenAIProvider(BaseAIProvider):
         parsed = json.loads(clean)
         return schema.model_validate(parsed)
 
+    async def generate_embeddings(
+        self,
+        texts: list[str],
+        *,
+        model: str | None = None,
+        dimensions: int = 1536,
+    ) -> list[list[float]]:
+        target_model = model or "text-embedding-3-small"
+        if not self.api_key:
+            results = []
+            for t in texts:
+                h = hashlib.sha256(t.encode("utf-8")).digest()
+                vec = [float((h[i % len(h)] + (i * 17) % 256) - 128) / 128.0 for i in range(dimensions)]
+                norm = (sum(x * x for x in vec) ** 0.5) or 1.0
+                results.append([x / norm for x in vec])
+            return results
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        body = {"model": target_model, "input": texts}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(f"{self.base_url}/embeddings", headers=headers, json=body)
+            if resp.status_code != 200:
+                raise AIProviderError(f"OpenAI embedding error {resp.status_code}: {resp.text}", status_code=resp.status_code)
+            data = resp.json()
+            return [item["embedding"] for item in data.get("data", [])]
+
 
 class MockProvider(BaseAIProvider):
     """
@@ -527,6 +610,12 @@ class MockProvider(BaseAIProvider):
                 mock_data[field_name] = 0.90
             elif "int" in ann_str:
                 mock_data[field_name] = 1
+            elif "date" in ann_str:
+                mock_data[field_name] = "2025-10-15"
+            elif "eventtype" in ann_str or "event_type" in field_name:
+                mock_data[field_name] = "export_restriction"
+            elif "severity" in ann_str or "severity" in field_name:
+                mock_data[field_name] = "moderate"
             elif "list" in ann_str:
                 mock_data[field_name] = []
             elif "dict" in ann_str:
@@ -538,6 +627,22 @@ class MockProvider(BaseAIProvider):
             else:
                 mock_data[field_name] = f"Test {field_name}"
         return schema.model_validate(mock_data)
+
+    async def generate_embeddings(
+        self,
+        texts: list[str],
+        *,
+        model: str | None = None,
+        dimensions: int = 1024,
+    ) -> list[list[float]]:
+        self.call_count += 1
+        results: list[list[float]] = []
+        for text in texts:
+            h = hashlib.sha256(text.encode("utf-8")).digest()
+            vec = [float((h[i % len(h)] + (i * 17) % 256) - 128) / 128.0 for i in range(dimensions)]
+            norm = (sum(x * x for x in vec) ** 0.5) or 1.0
+            results.append([x / norm for x in vec])
+        return results
 
 
 def get_ai_provider(provider_name: str | None = None) -> BaseAIProvider:

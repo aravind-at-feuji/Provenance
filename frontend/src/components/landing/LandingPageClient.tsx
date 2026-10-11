@@ -10,7 +10,6 @@ import { OutreachBentoGrid } from "./OutreachBentoGrid";
 import { VennSection } from "./VennSection";
 import { MetricsAndTestimonials } from "./MetricsAndTestimonials";
 import { IntegrationsSection } from "./IntegrationsSection";
-import { PricingSection } from "./PricingSection";
 import { FinalCTASection } from "./FinalCTASection";
 import { Footer } from "./Footer";
 import { AgentDemoModal } from "./AgentDemoModal";
@@ -54,9 +53,6 @@ export function LandingPageClient() {
 
         {/* 8. Integrations Hub */}
         <IntegrationsSection />
-
-        {/* 9. Simple Pricing Plans */}
-        <PricingSection />
 
         {/* 10. Final Call-To-Action Banner */}
         <FinalCTASection onLaunchDemo={handleLaunchDemo} />
