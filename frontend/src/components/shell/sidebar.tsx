@@ -118,12 +118,12 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col border-r border-neutral-200/80 bg-white transition-all duration-300 z-30 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]",
+        "flex flex-col h-full shrink-0 border-r border-neutral-200/80 bg-white transition-all duration-300 z-30 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
       {/* Brand Header */}
-      <div className="flex h-16 items-center justify-between border-b border-neutral-100 px-3.5">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-100 px-3.5">
         {!isCollapsed ? (
           <>
             <Link href="/dashboard" className="flex items-center gap-2 pl-1 group">
@@ -281,41 +281,10 @@ export function Sidebar() {
             {!isCollapsed && <span className="flex-1 truncate">Platform Admin</span>}
           </Link>
         )}
-
-        {/* Bottom CTA Card: Enterprise Risk Engine (Gojiberry Style) */}
-        {!isCollapsed && (
-          <div className="pt-4 pb-2">
-            <div className="relative rounded-2xl bg-gradient-to-br from-[#FA651E] via-[#F85A2A] to-[#E03368] text-white p-3.5 shadow-sm overflow-hidden group">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-xs">
-                    ⚡
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-bold leading-tight">Enterprise Risk</h5>
-                    <p className="text-[10px] text-white/80">Tier-5 graph vigilance</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-white/70 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-
-              <div className="bg-black/15 rounded-md px-2 py-1 mb-2.5 flex items-center justify-between text-[10px] font-mono">
-                <span className="text-white/90">Engine Status:</span>
-                <span className="text-emerald-300 font-semibold">Deterministic</span>
-              </div>
-
-              <Link
-                href="/investigate"
-                className="w-full text-center block bg-white hover:bg-neutral-50 text-neutral-950 font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all"
-              >
-                Run Exposure Scan →
-              </Link>
-            </div>
-          </div>
-        )}
       </div>
 
-      <div className="border-t border-neutral-100 p-2 bg-neutral-50/40">
+      {/* Bottom User Profile Section */}
+      <div className="shrink-0 border-t border-neutral-100 p-2 bg-neutral-50/40">
         <UserMenu isCollapsed={isCollapsed} />
       </div>
     </aside>

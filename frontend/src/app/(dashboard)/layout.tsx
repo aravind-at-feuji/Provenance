@@ -41,9 +41,9 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground bg-ambient-mesh">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground bg-ambient-mesh">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+      <main className="flex-1 h-full overflow-y-auto p-6 lg:p-8">
         <UserStoreSync />
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
