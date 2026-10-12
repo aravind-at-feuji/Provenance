@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Gauge,
   Compass,
@@ -15,14 +15,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
-  HelpCircle,
-  BookOpen,
-  Lock,
   ChevronDown,
+  MessageSquare,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui-store";
 import { useUserStore } from "@/lib/store/user-store";
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
+import { useConversationStore, formatRelativeTime } from "@/lib/store/conversation-store";
 import { ProvenanceLogo } from "@/components/landing/ProvenanceLogo";
 import { UserMenu } from "./user-menu";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ interface NavItem {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const isCollapsed = useUIStore((s) => s.isSidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const isPlatformAdmin = useUserStore((s) => s.isPlatformAdmin);
@@ -47,6 +49,12 @@ export function Sidebar() {
   const { getToken } = useAppAuth();
   const [activeAlertsCount, setActiveAlertsCount] = useState<number | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+
+  const conversations = useConversationStore((s) => s.conversations);
+  const activeConversationId = useConversationStore((s) => s.activeConversationId);
+  const selectConversation = useConversationStore((s) => s.selectConversation);
+  const createConversation = useConversationStore((s) => s.createConversation);
+  const deleteConversation = useConversationStore((s) => s.deleteConversation);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -68,6 +76,9 @@ export function Sidebar() {
       }
     }
     fetchCounts();
+    return () => {
+      isMounted = false;
+    };
   }, [orgId, getToken, pathname]);
 
   const navItems: NavItem[] = [
@@ -163,45 +174,129 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1">
         {navItems.map((item) => {
           const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            pathname === item.href || (item.href !== "/trace" && pathname.startsWith(`${item.href}/`)) || (item.href === "/trace" && pathname.startsWith("/trace"));
           const Icon = item.icon;
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs transition-all duration-150",
-                isActive
-                  ? "bg-neutral-100 text-neutral-950 font-semibold shadow-2xs border border-neutral-200/60"
-                  : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-950 font-medium"
-              )}
-              title={isCollapsed ? (item.title === "Trace" ? "Agent Trace" : item.title) : undefined}
-            >
-              <Icon
+            <React.Fragment key={item.href}>
+              <Link
+                href={item.href}
                 className={cn(
-                  "h-4 w-4 shrink-0 transition-transform group-hover:scale-105",
-                  isActive ? "text-[#FA651E]" : "text-neutral-500"
+                  "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs transition-all duration-150",
+                  isActive
+                    ? "bg-neutral-100 text-neutral-950 font-semibold shadow-2xs border border-neutral-200/60"
+                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-950 font-medium"
                 )}
-              />
-              {!isCollapsed && (
-                <span className="flex-1 truncate tracking-tight">{item.title}</span>
+                title={isCollapsed ? (item.title === "Trace" ? "Agent Trace" : item.title) : undefined}
+              >
+                <Icon
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-transform group-hover:scale-105",
+                    isActive ? "text-[#FA651E]" : "text-neutral-500"
+                  )}
+                />
+                {!isCollapsed && (
+                  <span className="flex-1 truncate tracking-tight">{item.title}</span>
+                )}
+                {!isCollapsed && item.badge && (
+                  item.badgeVariant === "ai" ? (
+                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#FA651E]/10 text-[#FA651E] border border-[#FA651E]/20 font-mono">
+                      {item.badge}
+                    </span>
+                  ) : (
+                    <Badge
+                      variant={item.badgeVariant ?? "secondary"}
+                      className="ml-auto text-[10px] py-0 px-1.5 font-mono"
+                    >
+                      {item.badge}
+                    </Badge>
+                  )
+                )}
+              </Link>
+
+              {/* Conversation History below Trace tab */}
+              {item.title === "Trace" && !isCollapsed && (
+                <div className="mt-1 mb-2 ml-3 pl-2.5 border-l-2 border-neutral-100 space-y-1">
+                  <div className="flex items-center justify-between px-1 py-1 text-[10px] font-mono font-bold tracking-wider text-neutral-400">
+                    <span>CHATS {conversations.length > 0 ? `(${conversations.length})` : ""}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        createConversation();
+                        if (pathname !== "/trace") {
+                          router.push("/trace");
+                        }
+                      }}
+                      className="p-1 rounded-md text-neutral-400 hover:text-[#FA651E] hover:bg-orange-50 transition-colors"
+                      title="Start a new chat"
+                      aria-label="Start a new chat"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {conversations.length === 0 ? (
+                    <div className="px-2 py-1 text-[11px] text-neutral-400 italic">
+                      No past chats yet
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5 max-h-52 overflow-y-auto pr-1">
+                      {conversations.slice(0, 10).map((conv) => {
+                        const isCurrentActive = pathname === "/trace" && activeConversationId === conv.id;
+                        return (
+                          <div
+                            key={conv.id}
+                            onClick={() => {
+                              selectConversation(conv.id);
+                              if (pathname !== "/trace") {
+                                router.push("/trace");
+                              }
+                            }}
+                            className={cn(
+                              "group flex items-center justify-between rounded-lg px-2 py-1.5 text-[11px] cursor-pointer transition-all duration-150 select-none",
+                              isCurrentActive
+                                ? "bg-orange-50/90 text-[#FA651E] font-semibold border border-[#FA651E]/20 shadow-2xs"
+                                : "text-neutral-600 hover:bg-neutral-100/70 hover:text-neutral-950 font-normal"
+                            )}
+                            title={conv.title}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                              <MessageSquare
+                                className={cn(
+                                  "w-3 h-3 shrink-0",
+                                  isCurrentActive ? "text-[#FA651E]" : "text-neutral-400 group-hover:text-neutral-600"
+                                )}
+                              />
+                              <span className="truncate">{conv.title}</span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-[9px] text-neutral-400 font-mono group-hover:hidden">
+                                {formatRelativeTime(conv.updatedAt)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  deleteConversation(conv.id);
+                                }}
+                                className="hidden group-hover:flex items-center justify-center p-0.5 rounded text-neutral-400 hover:text-destructive hover:bg-neutral-200/60 transition-colors"
+                                title="Delete chat"
+                                aria-label="Delete chat"
+                              >
+                                <Trash2 className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
-              {!isCollapsed && item.badge && (
-                item.badgeVariant === "ai" ? (
-                  <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#FA651E]/10 text-[#FA651E] border border-[#FA651E]/20 font-mono">
-                    {item.badge}
-                  </span>
-                ) : (
-                  <Badge
-                    variant={item.badgeVariant ?? "secondary"}
-                    className="ml-auto text-[10px] py-0 px-1.5 font-mono"
-                  >
-                    {item.badge}
-                  </Badge>
-                )
-              )}
-            </Link>
+            </React.Fragment>
           );
         })}
 

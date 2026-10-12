@@ -4,23 +4,18 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Sparkles,
-  Send,
   Loader2,
   CheckCircle2,
   AlertTriangle,
-  ExternalLink,
   Plus,
   BarChart3,
   RefreshCw,
   Building2,
-  Layers,
   ChevronDown,
   ChevronUp,
-  RotateCcw,
   Check,
   Network,
   ArrowUp,
-  ShieldCheck,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +34,7 @@ import { useAutoResizeTextarea } from "@/components/ui/v0-ai-chat";
 import { cn } from "@/lib/utils";
 import { useUserStore } from "@/lib/store/user-store";
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
+import { useConversationStore } from "@/lib/store/conversation-store";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,13 +137,36 @@ export function AgentTraceWorkspace(): React.JSX.Element {
   const orgId = useUserStore((s) => s.orgId);
   const { getToken } = useAppAuth();
 
+  const conversations = useConversationStore((s) => s.conversations);
+  const activeConversationId = useConversationStore((s) => s.activeConversationId);
+  const selectConversation = useConversationStore((s) => s.selectConversation);
+  const createConversation = useConversationStore((s) => s.createConversation);
+  const updateActiveMessages = useConversationStore((s) => s.updateActiveMessages);
+
   const [query, setQuery] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Conversational message history (ChatGPT / Claude format)
+  // Conversational message history
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Sync messages with active conversation from store
+  useEffect(() => {
+    if (activeConversationId) {
+      const active = conversations.find((c) => c.id === activeConversationId);
+      if (active) {
+        setMessages(active.messages || []);
+        return;
+      }
+    }
+    if (conversations.length > 0) {
+      selectConversation(conversations[0].id);
+      setMessages(conversations[0].messages || []);
+    } else {
+      setMessages([]);
+    }
+  }, [activeConversationId, conversations, selectConversation]);
 
   // Collapsible sections per message
   const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
@@ -236,10 +255,12 @@ export function AgentTraceWorkspace(): React.JSX.Element {
     setExpandedFetched((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   };
 
-  const handleClearChat = () => {
+  const handleNewChat = () => {
+    createConversation();
     setMessages([]);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setQuery("");
   };
 
   // ── Action 1: Add Supplier ─────────────────────────────────────────────────
@@ -348,7 +369,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           traceRecord,
         };
 
-        setMessages((prev) => [...prev, userMsg, assistantMsg]);
+        const nextMsgs = [...messages, userMsg, assistantMsg];
+        setMessages(nextMsgs);
+        updateActiveMessages(nextMsgs);
         setSuccessMessage(`Supplier "${payload.legal_name}" added successfully.`);
         setIsAddSupplierOpen(false);
 
@@ -452,7 +475,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           traceRecord,
         };
 
-        setMessages((prev) => [...prev, userMsg, assistantMsg]);
+        const nextMsgs = [...messages, userMsg, assistantMsg];
+        setMessages(nextMsgs);
+        updateActiveMessages(nextMsgs);
         setIsAnalyzeCompanyOpen(false);
       } else {
         const err = await res.json().catch(() => ({}));
@@ -579,7 +604,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         traceRecord,
       };
 
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      const nextMsgs = [...messages, userMsg, assistantMsg];
+      setMessages(nextMsgs);
+      updateActiveMessages(nextMsgs);
       setSuccessMessage(`Get & Fetch complete: retrieved ${events.length} events and ${suppliers.length} suppliers.`);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Error connecting to backend services");
@@ -601,7 +628,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
       createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const currentWithUser = [...messages, userMsg];
+    setMessages(currentWithUser);
+    updateActiveMessages(currentWithUser);
     setQuery("");
     adjustHeight(true);
 
@@ -657,7 +686,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         },
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      const withAssistant = [...currentWithUser, assistantMsg];
+      setMessages(withAssistant);
+      updateActiveMessages(withAssistant);
       return;
     }
 
@@ -793,7 +824,11 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           traceRecord,
         };
 
-        setMessages((prev) => [...prev, assistantMsg]);
+        setMessages((prev) => {
+          const next = [...prev, assistantMsg];
+          updateActiveMessages(next);
+          return next;
+        });
       } else {
         const err = await res.json().catch(() => ({}));
         setErrorMessage(err.detail || err.title || "Investigation agent request failed");
@@ -830,40 +865,45 @@ export function AgentTraceWorkspace(): React.JSX.Element {
     }
   };
 
+  const currentConv = conversations.find((c) => c.id === activeConversationId);
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl mx-auto w-full relative">
-      {/* ── Top Header Bar (ChatGPT / Claude Style) ────────────────────────── */}
-      <div className="flex items-center justify-between pb-3 mb-2 border-b border-neutral-100 dark:border-neutral-800/80 px-2 shrink-0">
+      {/* ── Top Header Bar ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pb-3 mb-2 border-b border-neutral-200/80 px-2 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#FA651E]/10 border border-[#FA651E]/20 text-[#FA651E] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-[#FA651E]/10 border border-[#FA651E]/20 text-[#FA651E] flex items-center justify-center shrink-0">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-neutral-900 dark:text-white tracking-tight">
+              <h1 className="text-sm font-bold text-neutral-900 tracking-tight">
                 Agent Trace
               </h1>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Autonomous Copilot Online" />
+              {currentConv && currentConv.title && currentConv.title !== "New Conversation" && (
+                <span className="hidden sm:inline-block text-[11px] font-medium text-neutral-500 border-l border-neutral-200 pl-2 max-w-[240px] truncate font-mono">
+                  {currentConv.title}
+                </span>
+              )}
             </div>
-            <p className="text-[11px] text-neutral-400">
+            <p className="text-[11px] text-neutral-500">
               Autonomous Supply Chain Copilot
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {messages.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleClearChat}
-              className="text-xs h-8 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>New Chat</span>
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleNewChat}
+            className="text-xs h-8 rounded-xl border-neutral-200 text-neutral-700 hover:text-neutral-950 hover:bg-neutral-50 gap-1.5 shadow-2xs"
+          >
+            <Plus className="w-3.5 h-3.5 text-[#FA651E]" />
+            <span>New Chat</span>
+          </Button>
         </div>
       </div>
 
@@ -881,7 +921,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
       )}
 
       {successMessage && (
-        <div className="mx-2 mb-3 flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400 shrink-0">
+        <div className="mx-2 mb-3 flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 shrink-0">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successMessage}</span>
@@ -892,20 +932,20 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         </div>
       )}
 
-      {/* ── Chat Messages Scroll Area (ChatGPT / Claude Style) ─────────────── */}
+      {/* ── Chat Messages Scroll Area ─────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-2 space-y-6 pb-44">
         {messages.length === 0 ? (
           /* Empty Chat Welcome State */
           <div className="py-8 sm:py-12 text-center space-y-8 max-w-2xl mx-auto">
             <div className="space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 text-[#FA651E] flex items-center justify-center mx-auto shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#FA651E] flex items-center justify-center mx-auto shadow-xs">
                 <Sparkles className="w-7 h-7" />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight">
                 How can I help with your supply chain today?
               </h2>
-              <p className="text-xs sm:text-sm text-neutral-500 max-w-lg mx-auto leading-relaxed">
-                I can help you analyze supplier risks, enroll new vendors, fetch real-time regulatory feeds, or answer questions conversationally like a trusted colleague.
+              <p className="text-xs sm:text-sm text-neutral-600 max-w-lg mx-auto leading-relaxed">
+                I can help you evaluate supplier risks, enroll new vendors, fetch real-time regulatory feeds, or answer questions conversationally like a trusted colleague.
               </p>
             </div>
 
@@ -916,15 +956,15 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                   key={item.id}
                   type="button"
                   onClick={() => handleExecuteCommand(item.prompt)}
-                  className="p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-[#FA651E]/40 hover:bg-neutral-50/80 dark:hover:bg-neutral-800/80 transition-all text-left shadow-2xs group space-y-1.5"
+                  className="p-4 rounded-2xl border border-neutral-200/90 bg-white hover:border-[#FA651E]/40 hover:bg-orange-50/20 transition-all text-left shadow-2xs group space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-[#FA651E] transition-colors">
+                    <span className="text-xs font-bold text-neutral-900 group-hover:text-[#FA651E] transition-colors">
                       {item.title}
                     </span>
                     <Sparkles className="w-3.5 h-3.5 text-neutral-400 group-hover:text-[#FA651E] transition-colors" />
                   </div>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">
+                  <p className="text-[11px] text-neutral-500 line-clamp-1">
                     {item.description}
                   </p>
                 </button>
@@ -938,13 +978,13 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               {msg.role === "user" ? (
                 /* User Message Bubble */
                 <div className="flex justify-end items-start gap-3 pl-12">
-                  <div className="bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-950 px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed shadow-xs max-w-xl">
+                  <div className="bg-neutral-900 text-white px-4.5 py-3 rounded-2xl rounded-tr-xs text-sm leading-relaxed shadow-xs max-w-xl">
                     <p className="whitespace-pre-wrap">{msg.content}</p>
-                    <span className="block text-[10px] text-neutral-400 dark:text-neutral-500 text-right mt-1 font-mono">
+                    <span className="block text-[10px] text-neutral-400 text-right mt-1.5 font-mono">
                       {msg.createdAt}
                     </span>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center shrink-0 text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center shrink-0 text-xs font-bold text-neutral-700 mt-0.5">
                     <User className="w-4 h-4" />
                   </div>
                 </div>
@@ -956,10 +996,10 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                   </div>
                   <div className="space-y-3 flex-1 min-w-0">
                     {/* Primary Conversational Text */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 rounded-2xl rounded-tl-sm p-4 text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed shadow-2xs space-y-2">
+                    <div className="bg-white border border-neutral-200/90 rounded-2xl rounded-tl-xs p-4.5 text-sm text-neutral-900 leading-relaxed shadow-xs space-y-2">
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                       {msg.traceRecord?.details && (
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed pt-2 border-t border-neutral-100 dark:border-neutral-800 whitespace-pre-line">
+                        <p className="text-xs text-neutral-600 leading-relaxed pt-2 border-t border-neutral-100 whitespace-pre-line">
                           {msg.traceRecord.details}
                         </p>
                       )}
@@ -970,13 +1010,13 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                       </div>
                     </div>
 
-                    {/* Rich Embedded Trace Widget (if traceRecord exists) */}
+                    {/* Rich Embedded Trace Widget */}
                     {msg.traceRecord && (
-                      <div className="p-3.5 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40 space-y-3 text-xs">
+                      <div className="p-4 rounded-2xl border border-neutral-200/80 bg-neutral-50/80 space-y-3 text-xs shadow-2xs">
                         {/* Meta bar */}
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge variant="outline" className="text-[10px] font-mono uppercase py-0 font-bold">
+                            <Badge variant="outline" className="text-[10px] font-mono uppercase py-0 font-bold bg-white text-neutral-700 border-neutral-300">
                               {msg.traceRecord.action_type.replace("_", " ")}
                             </Badge>
                             {msg.traceRecord.risk_level && msg.traceRecord.risk_level !== "informational" && (
@@ -988,7 +1028,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                               </Badge>
                             )}
                             {msg.traceRecord.risk_level === "informational" && (
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">
                                 Copilot Response
                               </span>
                             )}
@@ -999,7 +1039,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                               <button
                                 type="button"
                                 onClick={() => toggleTrace(msg.id)}
-                                className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-neutral-600 dark:text-neutral-300 transition-colors flex items-center gap-1 text-[11px]"
+                                className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 text-neutral-700 transition-colors flex items-center gap-1 text-[11px] shadow-2xs"
                               >
                                 <span>Trace ({msg.traceRecord.execution_trace.length})</span>
                                 {expandedTraces[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -1009,7 +1049,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                               <button
                                 type="button"
                                 onClick={() => toggleCitations(msg.id)}
-                                className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-neutral-600 dark:text-neutral-300 transition-colors flex items-center gap-1 text-[11px]"
+                                className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 text-neutral-700 transition-colors flex items-center gap-1 text-[11px] shadow-2xs"
                               >
                                 <span>Citations ({msg.traceRecord.citations.length})</span>
                                 {expandedCitations[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -1019,7 +1059,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                               <button
                                 type="button"
                                 onClick={() => toggleFetched(msg.id)}
-                                className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 text-neutral-600 dark:text-neutral-300 transition-colors flex items-center gap-1 text-[11px]"
+                                className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 text-neutral-700 transition-colors flex items-center gap-1 text-[11px] shadow-2xs"
                               >
                                 <span>Records</span>
                                 {expandedFetched[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -1031,14 +1071,14 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                         {/* Verified Facts */}
                         {msg.traceRecord.key_findings && msg.traceRecord.key_findings.length > 0 && (
                           <div className="space-y-1.5 pt-1">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold block">
                               Verified Facts
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                               {msg.traceRecord.key_findings.map((finding, idx) => (
-                                <div key={idx} className="flex items-start gap-1.5 p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700/60 text-[11px] text-neutral-700 dark:text-neutral-300">
-                                  <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
-                                  <span>{finding}</span>
+                                <div key={idx} className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200/70 text-xs text-emerald-950">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                  <span className="leading-snug">{finding}</span>
                                 </div>
                               ))}
                             </div>
@@ -1047,29 +1087,29 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
                         {/* Collapsible Execution Trace */}
                         {expandedTraces[msg.id] && (
-                          <div className="space-y-1.5 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                          <div className="space-y-1.5 pt-2 border-t border-neutral-200/80">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold block">
                               Execution Plan &amp; Timings
                             </span>
                             <div className="space-y-1.5">
                               {msg.traceRecord.execution_trace.map((step, idx) => (
                                 <div
                                   key={step.step_id || idx}
-                                  className="p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 flex items-center justify-between text-[11px]"
+                                  className="p-2.5 rounded-xl border border-neutral-200 bg-white flex items-center justify-between text-xs"
                                 >
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="w-3.5 h-3.5 rounded-full bg-neutral-200 text-neutral-700 font-mono text-[9px] flex items-center justify-center font-bold">
+                                      <span className="w-4 h-4 rounded-full bg-neutral-100 text-neutral-700 font-mono text-[9px] flex items-center justify-center font-bold">
                                         {idx + 1}
                                       </span>
-                                      <span className="font-bold text-neutral-900 dark:text-white font-mono">{step.name}</span>
-                                      <span className="text-[9px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200/60">
+                                      <span className="font-semibold text-neutral-900 font-mono text-xs">{step.name}</span>
+                                      <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                         {step.status}
                                       </span>
                                     </div>
-                                    <p className="text-neutral-500 pl-5 text-[10px]">{step.action}</p>
+                                    <p className="text-neutral-500 pl-5.5 text-[11px]">{step.action}</p>
                                   </div>
-                                  <span className="font-mono text-[10px] text-neutral-400">{step.duration_ms}ms</span>
+                                  <span className="font-mono text-[10px] text-neutral-500 font-medium">{step.duration_ms}ms</span>
                                 </div>
                               ))}
                             </div>
@@ -1078,23 +1118,23 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
                         {/* Collapsible Citations */}
                         {expandedCitations[msg.id] && msg.traceRecord.citations && (
-                          <div className="space-y-1.5 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                          <div className="space-y-1.5 pt-2 border-t border-neutral-200/80">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold block">
                               Verified Evidence Citations
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {msg.traceRecord.citations.map((c) => (
-                                <div key={c.id} className="p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 space-y-1 text-[11px]">
+                                <div key={c.id} className="p-2.5 rounded-xl border border-neutral-200 bg-white space-y-1 text-xs">
                                   <div className="flex items-center justify-between">
                                     <Badge variant="secondary" className="text-[9px] font-mono py-0">
                                       {c.citation_type}
                                     </Badge>
-                                    <span className="text-[10px] font-mono text-emerald-600">
+                                    <span className="text-[10px] font-mono text-emerald-600 font-bold">
                                       {Math.round(c.confidence * 100)}%
                                     </span>
                                   </div>
-                                  <div className="font-bold text-neutral-900 dark:text-white">{c.title}</div>
-                                  <p className="text-neutral-500 text-[10px] line-clamp-2">{c.details}</p>
+                                  <div className="font-bold text-neutral-900">{c.title}</div>
+                                  <p className="text-neutral-600 text-[11px] line-clamp-2">{c.details}</p>
                                 </div>
                               ))}
                             </div>
@@ -1103,13 +1143,13 @@ export function AgentTraceWorkspace(): React.JSX.Element {
 
                         {/* Collapsible Fetched Records */}
                         {expandedFetched[msg.id] && msg.traceRecord.fetchedData && (
-                          <div className="space-y-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                            <div className="flex items-center gap-2 border-b border-neutral-200/60 dark:border-neutral-800 pb-1.5">
+                          <div className="space-y-2 pt-2 border-t border-neutral-200/80">
+                            <div className="flex items-center gap-2 border-b border-neutral-200 pb-1.5">
                               <button
                                 type="button"
                                 onClick={() => setFetchedSubTab("events")}
                                 className={cn(
-                                  "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors",
+                                  "px-2.5 py-1 rounded-lg text-xs font-medium transition-colors",
                                   fetchedSubTab === "events"
                                     ? "bg-neutral-900 text-white font-semibold"
                                     : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
@@ -1121,7 +1161,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                                 type="button"
                                 onClick={() => setFetchedSubTab("suppliers")}
                                 className={cn(
-                                  "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors",
+                                  "px-2.5 py-1 rounded-lg text-xs font-medium transition-colors",
                                   fetchedSubTab === "suppliers"
                                     ? "bg-neutral-900 text-white font-semibold"
                                     : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
@@ -1134,7 +1174,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                             {fetchedSubTab === "events" && (
                               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                                 {(msg.traceRecord.fetchedData.events || []).map((ev, idx) => (
-                                  <div key={idx} className="p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-100 text-[11px] space-y-1">
+                                  <div key={idx} className="p-2.5 rounded-xl bg-white border border-neutral-200 text-xs space-y-1">
                                     <div className="flex items-center justify-between">
                                       <Badge variant="secondary" className="text-[9px] uppercase font-mono py-0">
                                         {String(ev.event_type || "Notice")}
@@ -1143,7 +1183,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                                         {ev.published_at ? new Date(String(ev.published_at)).toLocaleDateString() : "Active"}
                                       </span>
                                     </div>
-                                    <p className="text-neutral-800 dark:text-neutral-200">{String(ev.summary || "Notice")}</p>
+                                    <p className="text-neutral-800 leading-snug">{String(ev.summary || "Notice")}</p>
                                   </div>
                                 ))}
                               </div>
@@ -1156,9 +1196,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                                   const name = String(comp.legal_name || sup.legal_name || "Supplier");
                                   const country = String(comp.country || sup.country || "US");
                                   return (
-                                    <div key={idx} className="p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-100 text-[11px] flex items-center justify-between">
-                                      <div className="font-bold text-neutral-900 dark:text-white">
-                                        {name} <span className="font-mono text-[10px] font-normal opacity-70">({country})</span>
+                                    <div key={idx} className="p-2.5 rounded-xl bg-white border border-neutral-200 text-xs flex items-center justify-between">
+                                      <div className="font-bold text-neutral-900">
+                                        {name} <span className="font-mono text-[10px] font-normal text-neutral-500">({country})</span>
                                       </div>
                                       <Button
                                         variant="outline"
@@ -1179,7 +1219,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                         {/* Recommended Actions Follow-Up Chips */}
                         {msg.traceRecord.recommended_actions && msg.traceRecord.recommended_actions.length > 0 && (
                           <div className="space-y-1.5 pt-1">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold block">
                               Suggested Follow-ups
                             </span>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1188,7 +1228,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                                   key={idx}
                                   type="button"
                                   onClick={() => handleExecuteCommand(act)}
-                                  className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-[#FA651E]/50 hover:bg-neutral-50 text-[11px] text-neutral-700 dark:text-neutral-300 transition-colors flex items-center gap-1.5"
+                                  className="px-3 py-1.5 rounded-full bg-white border border-neutral-200 hover:border-[#FA651E]/40 hover:bg-orange-50/60 text-xs text-neutral-700 hover:text-neutral-900 transition-all shadow-2xs flex items-center gap-1.5"
                                 >
                                   <span className="w-1.5 h-1.5 rounded-full bg-[#FA651E]" />
                                   <span>{act}</span>
@@ -1212,9 +1252,9 @@ export function AgentTraceWorkspace(): React.JSX.Element {
             <div className="w-8 h-8 rounded-xl bg-[#FA651E]/10 border border-[#FA651E]/20 text-[#FA651E] flex items-center justify-center shrink-0 mt-0.5">
               <Sparkles className="w-4 h-4 animate-pulse" />
             </div>
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 rounded-2xl rounded-tl-sm px-4 py-3 text-xs text-neutral-500 shadow-2xs flex items-center gap-2">
+            <div className="bg-white border border-neutral-200 rounded-2xl rounded-tl-xs px-4 py-3 text-xs text-neutral-600 shadow-2xs flex items-center gap-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FA651E]" />
-              <span>Agent Trace is thinking...</span>
+              <span>Agent Trace is analyzing and synthesizing...</span>
             </div>
           </div>
         )}
@@ -1222,15 +1262,15 @@ export function AgentTraceWorkspace(): React.JSX.Element {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Fixed Bottom Input Area (ChatGPT / Claude Style) ──────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-neutral-950 dark:via-neutral-950/95 pt-6 pb-4 px-2 z-20">
+      {/* ── Fixed Bottom Input Area ──────────────────────────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/95 to-transparent pt-6 pb-4 px-2 z-20">
         <div className="max-w-3xl mx-auto space-y-2">
           {/* Quick Action Shortcuts */}
           <div className="flex items-center gap-2 px-1 flex-wrap">
             <button
               type="button"
               onClick={() => setIsAddSupplierOpen(true)}
-              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+              className="px-3 py-1.5 rounded-full bg-white border border-neutral-200/90 hover:border-[#FA651E]/40 text-neutral-700 hover:text-neutral-900 transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
             >
               <Plus className="w-3.5 h-3.5 text-emerald-600" />
               <span>Add Supplier</span>
@@ -1238,7 +1278,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setIsAnalyzeCompanyOpen(true)}
-              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+              className="px-3 py-1.5 rounded-full bg-white border border-neutral-200/90 hover:border-[#FA651E]/40 text-neutral-700 hover:text-neutral-900 transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
             >
               <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
               <span>Analyze Company</span>
@@ -1247,14 +1287,14 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               type="button"
               onClick={handleGetAndFetchData}
               disabled={isLoading}
-              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+              className="px-3 py-1.5 rounded-full bg-white border border-neutral-200/90 hover:border-[#FA651E]/40 text-neutral-700 hover:text-neutral-900 transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs"
             >
               <RefreshCw className={cn("w-3.5 h-3.5 text-amber-600", isLoading && "animate-spin")} />
               <span>Get &amp; Fetch</span>
             </button>
             <Link
               href="/graph"
-              className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 hover:border-[#FA651E]/40 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs ml-auto"
+              className="px-3 py-1.5 rounded-full bg-white border border-neutral-200/90 hover:border-[#FA651E]/40 text-neutral-700 hover:text-neutral-900 transition-all text-xs font-medium flex items-center gap-1.5 shadow-2xs ml-auto"
             >
               <Network className="w-3.5 h-3.5 text-purple-600" />
               <span className="hidden sm:inline">Graph View</span>
@@ -1262,7 +1302,7 @@ export function AgentTraceWorkspace(): React.JSX.Element {
           </div>
 
           {/* Chat Input Card */}
-          <div className="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 shadow-md focus-within:ring-2 focus-within:ring-[#FA651E]/20 focus-within:border-[#FA651E] transition-all flex items-end p-2 gap-2">
+          <div className="relative bg-white rounded-2xl border border-neutral-300 shadow-sm focus-within:ring-2 focus-within:ring-[#FA651E]/20 focus-within:border-[#FA651E] transition-all flex items-end p-2.5 gap-2">
             <Textarea
               ref={textareaRef}
               value={query}
@@ -1274,10 +1314,10 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               disabled={isLoading}
               placeholder="Message Agent Trace... (e.g. 'hello', 'analyze Cotiviti', 'add supplier TSMC')"
               className={cn(
-                "w-full px-3 py-2 text-sm",
-                "resize-none bg-transparent border-none text-neutral-900 dark:text-white",
+                "w-full px-2.5 py-1.5 text-sm",
+                "resize-none bg-transparent border-none text-neutral-900",
                 "focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                "placeholder:text-neutral-400 dark:placeholder:text-neutral-500",
+                "placeholder:text-neutral-400",
                 "min-h-[44px] max-h-[160px]"
               )}
               rows={1}
@@ -1291,13 +1331,16 @@ export function AgentTraceWorkspace(): React.JSX.Element {
               className={cn(
                 "w-8 h-8 rounded-xl shrink-0 transition-all",
                 query.trim()
-                  ? "bg-[#FA651E] hover:bg-[#E05310] text-white"
-                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed"
+                  ? "bg-[#FA651E] hover:bg-[#E05310] text-white shadow-xs"
+                  : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
               )}
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
             </Button>
           </div>
+          <p className="text-[10px] text-neutral-400 text-center font-mono">
+            Enter to send · Shift + Enter for new line
+          </p>
         </div>
       </div>
 

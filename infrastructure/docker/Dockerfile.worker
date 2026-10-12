@@ -7,10 +7,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
+COPY backend/pyproject.toml ./pyproject.toml
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -e ".[dev]"
 
-COPY . .
+COPY backend /app
+COPY workers /workers
+COPY ingestion /ingestion
+COPY agents /agents
+COPY database /database
+
+ENV PYTHONPATH="/app:/"
 
 CMD ["celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]
