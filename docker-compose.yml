@@ -33,14 +33,15 @@ services:
   # ── FastAPI backend ────────────────────────────────────────────────────────
   api:
     build:
-      context: ./backend
-      dockerfile: ../infrastructure/docker/Dockerfile.api
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://provenance:provenance@postgres:5432/provenance
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      PYTHONPATH: /app:/ingestion:/workers:/agents:/database:/
     ports:
       - "8000:8000"
     depends_on:
@@ -50,19 +51,24 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      - ./workers:/workers
+      - ./ingestion:/ingestion
+      - ./agents:/agents
+      - ./database:/database
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # ── Celery worker ─────────────────────────────────────────────────────────
   worker:
     build:
-      context: ./backend
-      dockerfile: ../infrastructure/docker/Dockerfile.worker
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.worker
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://provenance:provenance@postgres:5432/provenance
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      PYTHONPATH: /app:/ingestion:/workers:/agents:/database:/
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,19 +77,23 @@ services:
     volumes:
       - ./backend:/app
       - ./workers:/workers
+      - ./ingestion:/ingestion
+      - ./agents:/agents
+      - ./database:/database
     command: celery -A workers.celery_app worker --loglevel=info -Q ingest,ai,notify
 
   # ── Celery Beat scheduler ─────────────────────────────────────────────────
   beat:
     build:
-      context: ./backend
-      dockerfile: ../infrastructure/docker/Dockerfile.worker
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.worker
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://provenance:provenance@postgres:5432/provenance
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      PYTHONPATH: /app:/ingestion:/workers:/agents:/database:/
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +102,9 @@ services:
     volumes:
       - ./backend:/app
       - ./workers:/workers
+      - ./ingestion:/ingestion
+      - ./agents:/agents
+      - ./database:/database
     command: celery -A workers.celery_app beat --loglevel=info
 
   # ── Next.js frontend ───────────────────────────────────────────────────────
@@ -102,6 +115,7 @@ services:
     env_file: .env
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      INTERNAL_API_URL: http://api:8000
     ports:
       - "3000:3000"
     volumes:

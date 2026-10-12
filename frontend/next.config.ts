@@ -25,10 +25,11 @@ const nextConfig: NextConfig = {
   // Rewrites proxy /api/v1/* to the FastAPI backend during local dev,
   // so the browser never makes cross-origin requests in dev.
   async rewrites() {
+    const backendUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
     return [
       {
         source: "/api/v1/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}/v1/:path*`,
+        destination: `${backendUrl}/v1/:path*`,
       },
     ];
   },
