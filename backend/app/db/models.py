@@ -73,4 +73,10 @@ from app.modules.notifications.models import (  # noqa: F401
 # ── 8. Audit (append-only) ───────────────────────────────────────────────────
 from app.modules.admin.models import AuditLog  # noqa: F401
 
+# ── 9. Phase 1 — Procurement foundation ─────────────────────────────────────
+from app.modules.items.models import Item  # noqa: F401
+from app.modules.procurement.models import MaterialRequest, MaterialRequestItem  # noqa: F401
+from app.modules.approvals.models import ApprovalRule, ApprovalWorkflow, ApprovalStep  # noqa: F401
+
 __all__ = ["Base"]
+

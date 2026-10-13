@@ -42,8 +42,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/onboarding" className="hover:text-neutral-950 transition-colors">
-                  Vendor Onboarding
+                <Link href="/material-requests" className="hover:text-neutral-950 transition-colors">
+                  Material Requests
                 </Link>
               </li>
             </ul>

@@ -108,17 +108,23 @@ export default function DashboardPage(): React.JSX.Element {
       if (token) headers["Authorization"] = `Bearer ${token}`;
       if (orgId) headers["x-org-id"] = orgId;
 
-      // 1. Fetch live suppliers
-      const supRes = await fetch("/api/v1/suppliers?limit=100", { headers });
-      if (supRes.ok) {
+      // Fetch all dashboard data concurrently
+      const [supRes, revRes, hRes, riskRes] = await Promise.all([
+        fetch("/api/v1/suppliers?limit=100", { headers }).catch(() => null),
+        fetch("/api/v1/entity-reviews?status=pending", { headers }).catch(() => null),
+        fetch("/api/v1/health").catch(() => null),
+        fetch("/api/v1/risks/summary", { headers }).catch(() => null),
+      ]);
+
+      // 1. Process live suppliers
+      if (supRes && supRes.ok) {
         const supData = await supRes.json();
         setSuppliers(supData.data || []);
       } else {
         setSuppliers([]);
       }
 
-      // 2. Fetch pending entity reviews
-      const revRes = await fetch("/api/v1/entity-reviews?status=pending", { headers }).catch(() => null);
+      // 2. Process pending entity reviews
       if (revRes && revRes.ok) {
         const revData = await revRes.json();
         setPendingReviews(revData.data || []);
@@ -126,15 +132,13 @@ export default function DashboardPage(): React.JSX.Element {
         setPendingReviews([]);
       }
 
-      // 3. Fetch system health
-      const hRes = await fetch("/api/v1/health").catch(() => null);
+      // 3. Process system health
       if (hRes && hRes.ok) {
         const hData = await hRes.json();
         setHealthStatus(hData.status === "ok" ? "Operational" : "Degraded");
       }
 
-      // 4. Fetch live deterministic risk engine summary (Phase 11)
-      const riskRes = await fetch("/api/v1/risks/summary", { headers }).catch(() => null);
+      // 4. Process live deterministic risk engine summary (Phase 11)
       if (riskRes && riskRes.ok) {
         const riskData = await riskRes.json();
         setRiskSummary(riskData);

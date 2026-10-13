@@ -400,11 +400,6 @@ export default function SuppliersPage() {
               <Sparkles className="h-3.5 w-3.5 text-primary" /> Review Queue
             </Link>
           </Button>
-          <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
-            <Link href="/onboarding">
-              <Layers className="h-3.5 w-3.5 text-primary" /> Onboarding Wizard
-            </Link>
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setIsBulkModalOpen(true)} className="gap-1.5 text-xs">
             <Upload className="h-3.5 w-3.5" /> Bulk CSV Import
           </Button>
@@ -564,14 +559,14 @@ export default function SuppliersPage() {
                     <Building2 className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
                     <p className="font-semibold text-foreground">No suppliers found</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Seed your direct supply base via CSV or using the Onboarding Wizard.
+                      Seed your direct supply base via CSV or add suppliers manually.
                     </p>
                     <div className="mt-4 flex justify-center gap-2">
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href="/onboarding">Launch Onboarding Wizard</Link>
+                      <Button size="sm" variant="outline" onClick={() => setIsAddModalOpen(true)}>
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Add Supplier
                       </Button>
                       <Button size="sm" onClick={() => setIsBulkModalOpen(true)}>
-                        Import CSV
+                        <Upload className="h-3.5 w-3.5 mr-1" /> Import CSV
                       </Button>
                     </div>
                   </td>

@@ -25,11 +25,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CytoscapeGraph,
+import dynamic from "next/dynamic";
+import type {
   GraphNodeData,
   GraphEdgeData,
 } from "@/components/graph/cytoscape-graph";
+
+const CytoscapeGraph = dynamic(
+  () => import("@/components/graph/cytoscape-graph").then((mod) => mod.CytoscapeGraph),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center bg-white/50">
+        <div className="flex items-center gap-2.5 text-xs text-neutral-500 font-mono">
+          <RefreshCw className="h-4 w-4 animate-spin text-[#FA651E]" />
+          <span>LOADING GRAPH ENGINE...</span>
+        </div>
+      </div>
+    ),
+  }
+);
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
 
 export default function GraphPage(): React.JSX.Element {

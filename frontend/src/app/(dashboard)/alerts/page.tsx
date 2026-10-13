@@ -147,7 +147,6 @@ export default function AlertsPage() {
 
   // Fetch alerts with current filters
   const fetchAlerts = useCallback(async () => {
-    if (!orgId) return;
     setIsLoading(true);
     setErrorMsg(null);
     try {
