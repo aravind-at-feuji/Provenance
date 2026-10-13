@@ -17,7 +17,7 @@ export function ProvenanceLogo({
   size = "md",
   inverted = false,
   withTagline = false,
-}: ProvenanceLogoProps) {
+}: ProvenanceLogoProps): React.ReactElement {
   const sizeMap = {
     sm: { width: 110, height: 32 },
     md: { width: 140, height: 42 },
@@ -31,7 +31,7 @@ export function ProvenanceLogo({
       <div className="relative flex items-center justify-center overflow-hidden">
         <Image
           src="/logo.png"
-          alt="Provenance — Supply Chain Risk Intelligence"
+          alt="Provenance — Agentic Procurement & Risk Platform"
           width={width}
           height={height}
           priority
@@ -41,6 +41,11 @@ export function ProvenanceLogo({
           style={{ maxHeight: `${height}px` }}
         />
       </div>
+      {withTagline && (
+        <span className="hidden lg:inline-block text-[10px] font-mono font-semibold tracking-wider uppercase text-neutral-400 pl-2 border-l border-neutral-300/70">
+          Agentic S2P &amp; Risk
+        </span>
+      )}
     </div>
   );
 }

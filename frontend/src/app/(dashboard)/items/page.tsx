@@ -1,28 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Package, Plus, RefreshCw, Layers, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { MetricCard } from "@/components/ui/metric-card";
+import React from "react";
+import { Package } from "lucide-react";
 import { ItemCatalog } from "@/components/procurement/item-catalog";
-import { useAppAuth } from "@/lib/auth/clerk-adapter";
-import { useUserStore } from "@/lib/store/user-store";
 
-export default function ItemsPage() {
-  const { getToken } = useAppAuth();
-  const orgId = useUserStore((s) => s.orgId);
-
-  const [totalCount, setTotalCount] = useState(0);
-  const [activeCount, setActiveCount] = useState(0);
-  const [categoriesCount, setCategoriesCount] = useState(0);
-
-  const handleItemsLoaded = React.useCallback((items: any[]) => {
-    setTotalCount(items.length);
-    setActiveCount(items.filter((i) => i.is_active).length);
-    const cats = new Set(items.map((i) => i.category || "General"));
-    setCategoriesCount(cats.size);
-  }, []);
-
+export default function ItemsPage(): React.ReactElement {
   return (
     <div className="flex-1 space-y-6 p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
@@ -38,33 +20,8 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard
-          title="Catalog Items"
-          value={totalCount}
-          subtitle="Registered item codes"
-          icon={<Package className="h-4 w-4 text-[#FA651E]" />}
-          accent="default"
-        />
-        <MetricCard
-          title="Active Items"
-          value={activeCount}
-          subtitle="Available for requisitioning"
-          icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-          accent="emerald"
-        />
-        <MetricCard
-          title="Taxonomy Categories"
-          value={categoriesCount}
-          subtitle="Active material groups"
-          icon={<Layers className="h-4 w-4 text-blue-500" />}
-          accent="blue"
-        />
-      </div>
-
       {/* Main Component */}
-      <ItemCatalog onItemsLoaded={handleItemsLoaded} />
+      <ItemCatalog />
     </div>
   );
 }

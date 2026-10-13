@@ -407,8 +407,8 @@ export default function GraphPage(): React.JSX.Element {
                   key={l}
                   onClick={() => setLayoutName(l)}
                   className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${layoutName === l
-                      ? "bg-purple-600 text-white shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   {l === "dagre" ? "Hierarchy (Dagre)" : l === "cose-bilkent" ? "Clusters (Cose)" : "Radial"}

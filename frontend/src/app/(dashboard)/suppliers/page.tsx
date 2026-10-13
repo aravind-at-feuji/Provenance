@@ -416,48 +416,8 @@ export default function SuppliersPage() {
         </div>
       )}
 
-      {/* KPI Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="glass-panel border-border/70 p-4">
-          <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
-            <span>Direct Suppliers</span>
-            <Building2 className="h-4 w-4 text-primary" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-foreground">{metrics.total}</div>
-          <span className="text-[11px] text-muted-foreground">Active graph nodes</span>
-        </Card>
-
-        <Card className="glass-panel border-border/70 p-4">
-          <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
-            <span>High Risk Criticality</span>
-            <ShieldAlert className="h-4 w-4 text-amber-500" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-amber-400">{metrics.highCrit}</div>
-          <span className="text-[11px] text-muted-foreground">Criticality Level 4 & 5</span>
-        </Card>
-
-        <Card className="glass-panel border-border/70 p-4">
-          <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
-            <span>Tracked Annual Spend</span>
-            <DollarSign className="h-4 w-4 text-emerald-400" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-foreground">
-            ${(metrics.totalSpend / 1000000).toFixed(1)}M
-          </div>
-          <span className="text-[11px] text-muted-foreground">USD exposure base</span>
-        </Card>
-
-        <Card className="glass-panel border-border/70 p-4">
-          <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
-            <span>Single Source Nodes</span>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-foreground">{metrics.singleSourceCount}</div>
-          <span className="text-[11px] text-muted-foreground">Sole-source dependencies</span>
-        </Card>
-      </div>
-
       {/* Filter and Search Toolbar */}
+
       <Card className="glass-panel border-border/70 p-3.5">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="relative flex-1">

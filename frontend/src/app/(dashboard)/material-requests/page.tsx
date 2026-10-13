@@ -3,15 +3,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   ClipboardList,
-  Clock,
-  CheckCircle2,
   AlertCircle,
   Plus,
   RefreshCw,
-  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MetricCard } from "@/components/ui/metric-card";
 import {
   MaterialRequestList,
   MaterialRequestListItem,
@@ -20,7 +16,7 @@ import { MaterialRequestFormModal } from "@/components/procurement/material-requ
 import { useAppAuth } from "@/lib/auth/clerk-adapter";
 import { useUserStore } from "@/lib/store/user-store";
 
-export default function MaterialRequestsPage() {
+export default function MaterialRequestsPage(): React.ReactElement {
   const { getToken } = useAppAuth();
   const orgId = useUserStore((s) => s.orgId);
 
@@ -53,7 +49,7 @@ export default function MaterialRequestsPage() {
       const data = await res.json();
       setItems(data.items || []);
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to load material requests");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to load requests");
       setItems([]);
     } finally {
       setIsLoading(false);
@@ -78,12 +74,12 @@ export default function MaterialRequestsPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to submit request");
+        throw new Error(err.detail || "Failed to submit request for approval");
       }
 
       loadRequests();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Submission failed");
+      alert(err instanceof Error ? err.message : "Error submitting request");
     }
   };
 
@@ -107,15 +103,9 @@ export default function MaterialRequestsPage() {
 
       loadRequests();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Cancellation failed");
+      alert(err instanceof Error ? err.message : "Error cancelling request");
     }
   };
-
-  // Compute live KPIs
-  const totalCount = items.length;
-  const pendingCount = items.filter((i) => i.status === "pending_approval").length;
-  const approvedCount = items.filter((i) => i.status === "approved" || i.status === "ordered").length;
-  const totalValue = items.reduce((acc, i) => acc + (Number(i.total_estimated_amount) || 0), 0);
 
   return (
     <div className="flex-1 space-y-6 p-6 lg:p-8 max-w-7xl mx-auto">
@@ -151,38 +141,6 @@ export default function MaterialRequestsPage() {
             New Requisition
           </Button>
         </div>
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Requisitions"
-          value={totalCount}
-          subtitle="All active requests"
-          icon={<ClipboardList className="h-4 w-4 text-[#FA651E]" />}
-          accent="default"
-        />
-        <MetricCard
-          title="Pending Approval"
-          value={pendingCount}
-          subtitle="Awaiting DoA decision"
-          icon={<Clock className="h-4 w-4 text-amber-500" />}
-          accent="high"
-        />
-        <MetricCard
-          title="Approved / Ordered"
-          value={approvedCount}
-          subtitle="Ready for RFx or PO"
-          icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-          accent="emerald"
-        />
-        <MetricCard
-          title="Est. Total Value"
-          value={`$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-          subtitle="Aggregate requisition spend"
-          icon={<TrendingUp className="h-4 w-4 text-blue-500" />}
-          accent="blue"
-        />
       </div>
 
       {errorMsg && (
