@@ -650,8 +650,8 @@ CONVERSATION HISTORY:
             temperature=0.1,
             org_id=org_id,
         )
-        model_name = self.settings.llm_model_investigation
-        provider_name = self.settings.llm_provider
+        model_name = self.settings.llm_model_investigation or getattr(self.gateway.provider, "default_model", "openai/gpt-oss-120b")
+        provider_name = self.settings.llm_provider or getattr(self.gateway.provider, "name", "groq")
 
         step4_duration = int((time.perf_counter() - step4_start) * 1000)
         trace_steps.append(

@@ -927,9 +927,6 @@ export function AgentTraceWorkspace(): React.JSX.Element {
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-neutral-500">
-              Autonomous Supply Chain Copilot
-            </p>
           </div>
         </div>
 
