@@ -167,11 +167,19 @@ const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
   },
   {
     id: "sug-6",
-    title: "Get & Fetch Live Feeds",
-    prompt: "Get and fetch live regulatory disruption events and supplier catalog telemetry",
-    category: "disruption",
-    icon: "RefreshCw",
-    description: "Sync live regulatory signals and catalog state",
+    title: "Create Purchase Order",
+    prompt: "Issue purchase order for 500 units of raw steel supplies to Jindal Stainless Ltd.",
+    category: "procurement",
+    icon: "ShoppingCart",
+    description: "Generate binding PO and route for approval",
+  },
+  {
+    id: "sug-7",
+    title: "Record Goods Receipt",
+    prompt: "Record goods receipt note for the latest purchase order",
+    category: "procurement",
+    icon: "PackageCheck",
+    description: "Inspect and confirm intake delivery on dock",
   },
 ];
 

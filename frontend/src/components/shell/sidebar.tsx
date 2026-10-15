@@ -20,6 +20,8 @@ import {
   Package,
   FileQuestion,
   FileText,
+  ShoppingCart,
+  PackageCheck,
 } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui-store";
 import { useUserStore } from "@/lib/store/user-store";
@@ -106,6 +108,16 @@ export function Sidebar() {
       title: "Quotations",
       href: "/quotations",
       icon: FileText,
+    },
+    {
+      title: "Purchase Order",
+      href: "/purchase-orders",
+      icon: ShoppingCart,
+    },
+    {
+      title: "Purchase Receipt",
+      href: "/receipts",
+      icon: PackageCheck,
     },
     {
       title: "Approvals",

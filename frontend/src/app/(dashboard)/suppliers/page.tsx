@@ -589,7 +589,7 @@ export default function SuppliersPage() {
                     </td>
 
                     <td className="py-3 px-4 font-mono font-medium text-foreground">
-                      ${((sup.annual_spend_usd || 0)).toLocaleString()}
+                      {`$${(sup.annual_spend_usd || 0).toLocaleString()}`}
                     </td>
 
                     <td className="py-3 px-4">

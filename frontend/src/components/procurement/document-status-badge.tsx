@@ -91,6 +91,20 @@ export function DocumentStatusBadge({
     case "cancelled":
       styleClasses = "bg-rose-50 text-rose-700 border-rose-200/80 font-medium";
       break;
+    case "sent":
+      styleClasses = "bg-sky-50 text-sky-700 border-sky-300 font-medium";
+      break;
+    case "acknowledged":
+      styleClasses = "bg-indigo-50 text-indigo-700 border-indigo-300 font-medium";
+      break;
+    case "partially_received":
+    case "partial":
+      styleClasses = "bg-amber-50 text-amber-800 border-amber-300 font-medium";
+      break;
+    case "received":
+    case "confirmed":
+      styleClasses = "bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold";
+      break;
     case "closed":
       styleClasses = "bg-neutral-100 text-neutral-600 border-neutral-200";
       break;
