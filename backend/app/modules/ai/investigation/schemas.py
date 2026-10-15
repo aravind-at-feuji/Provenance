@@ -34,6 +34,8 @@ class InvestigationCitation(BaseModel):
         "material_request",
         "item",
         "approval",
+        "rfx",
+        "quotation",
     ]
     title: str
     details: str

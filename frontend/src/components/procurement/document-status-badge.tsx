@@ -8,12 +8,23 @@ export type ProcurementDocumentStatus =
   | "pending_approval"
   | "pending"
   | "approved"
+  | "published"
+  | "q_and_a"
+  | "evaluation"
+  | "negotiation"
+  | "awarded"
+  | "closed"
   | "ordered"
   | "partially_ordered"
   | "cancelled"
   | "rejected"
   | "active"
-  | "inactive";
+  | "inactive"
+  | "invited"
+  | "viewed"
+  | "responded"
+  | "shortlisted"
+  | "declined";
 
 interface DocumentStatusBadgeProps {
   status: string;
@@ -29,7 +40,6 @@ export function DocumentStatusBadge({
   const normalized = (status || "").toLowerCase().trim();
 
   let label = status.replace(/_/g, " ");
-  // Capitalize words
   label = label.replace(/\b\w/g, (c) => c.toUpperCase());
 
   let styleClasses = "bg-neutral-100 text-neutral-700 border-neutral-200";
@@ -42,8 +52,21 @@ export function DocumentStatusBadge({
     case "pending":
       styleClasses = "bg-amber-50 text-amber-700 border-amber-200/80 font-medium";
       break;
+    case "published":
+      styleClasses = "bg-cyan-50 text-cyan-700 border-cyan-200/80 font-medium";
+      break;
+    case "q_and_a":
+      styleClasses = "bg-sky-50 text-sky-700 border-sky-200/80 font-medium";
+      break;
+    case "evaluation":
+      styleClasses = "bg-purple-50 text-purple-700 border-purple-200/80 font-medium";
+      break;
+    case "negotiation":
+      styleClasses = "bg-blue-50 text-blue-700 border-blue-200/80 font-medium";
+      break;
     case "approved":
-      styleClasses = "bg-emerald-50 text-emerald-700 border-emerald-200/80 font-medium";
+    case "awarded":
+      styleClasses = "bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold";
       break;
     case "ordered":
       styleClasses = "bg-blue-50 text-blue-700 border-blue-200/80 font-medium";
@@ -51,9 +74,25 @@ export function DocumentStatusBadge({
     case "partially_ordered":
       styleClasses = "bg-indigo-50 text-indigo-700 border-indigo-200/80 font-medium";
       break;
+    case "responded":
+      styleClasses = "bg-teal-50 text-teal-700 border-teal-200/80 font-medium";
+      break;
+    case "shortlisted":
+      styleClasses = "bg-amber-50 text-amber-800 border-amber-300 font-medium";
+      break;
+    case "invited":
+      styleClasses = "bg-neutral-50 text-neutral-600 border-neutral-200";
+      break;
+    case "viewed":
+      styleClasses = "bg-blue-50 text-blue-600 border-blue-200";
+      break;
+    case "declined":
     case "rejected":
     case "cancelled":
       styleClasses = "bg-rose-50 text-rose-700 border-rose-200/80 font-medium";
+      break;
+    case "closed":
+      styleClasses = "bg-neutral-100 text-neutral-600 border-neutral-200";
       break;
     case "active":
       styleClasses = "bg-emerald-50 text-emerald-700 border-emerald-200/80 font-medium";
@@ -113,6 +152,43 @@ export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
       )}
     >
       {priority}
+    </span>
+  );
+}
+
+interface RFxTypeBadgeProps {
+  rfxType: string;
+  className?: string;
+}
+
+export function RFxTypeBadge({ rfxType, className }: RFxTypeBadgeProps) {
+  const norm = (rfxType || "rfq").toLowerCase();
+  let styleClasses = "bg-neutral-100 text-neutral-800 border-neutral-300";
+
+  switch (norm) {
+    case "rfq":
+      styleClasses = "bg-[#FFF2EB] text-[#FA651E] border-[#FA651E]/30 font-semibold";
+      break;
+    case "rfp":
+      styleClasses = "bg-purple-50 text-purple-700 border-purple-200 font-semibold";
+      break;
+    case "rfi":
+      styleClasses = "bg-blue-50 text-blue-700 border-blue-200 font-semibold";
+      break;
+    case "rft":
+      styleClasses = "bg-amber-50 text-amber-800 border-amber-300 font-semibold";
+      break;
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-mono uppercase tracking-wider font-bold",
+        styleClasses,
+        className
+      )}
+    >
+      {norm}
     </span>
   );
 }

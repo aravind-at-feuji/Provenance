@@ -18,6 +18,8 @@ import {
   Trash2,
   ClipboardList,
   Package,
+  FileQuestion,
+  FileText,
 } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui-store";
 import { useUserStore } from "@/lib/store/user-store";
@@ -94,6 +96,16 @@ export function Sidebar() {
       title: "Material Request",
       href: "/material-requests",
       icon: ClipboardList,
+    },
+    {
+      title: "RFQ / RFP",
+      href: "/rfx",
+      icon: FileQuestion,
+    },
+    {
+      title: "Quotations",
+      href: "/quotations",
+      icon: FileText,
     },
     {
       title: "Approvals",

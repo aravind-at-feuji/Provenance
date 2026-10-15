@@ -112,6 +112,9 @@ def create_app() -> FastAPI:
     from app.api.v1.items import router as items_router
     from app.api.v1.material_requests import router as material_requests_router
     from app.api.v1.approvals import router as approvals_router
+    # Phase 2 — Sourcing
+    from app.api.v1.rfx import router as rfx_router
+    from app.api.v1.supplier_quotations import router as supplier_quotations_router
 
     api_prefix = "/v1"
     application.include_router(health_router)
@@ -132,6 +135,9 @@ def create_app() -> FastAPI:
     application.include_router(items_router, prefix=api_prefix)
     application.include_router(material_requests_router, prefix=api_prefix)
     application.include_router(approvals_router, prefix=api_prefix)
+    # Phase 2 routers
+    application.include_router(rfx_router, prefix=api_prefix)
+    application.include_router(supplier_quotations_router, prefix=api_prefix)
 
     return application
 

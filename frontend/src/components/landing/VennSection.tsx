@@ -54,9 +54,8 @@ export function VennSection(): React.ReactElement {
             <div
               onMouseEnter={() => setActiveCircle("erp")}
               onMouseLeave={() => setActiveCircle(null)}
-              className={`absolute top-6 left-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${
-                activeCircle === "erp" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
-              }`}
+              className={`absolute top-6 left-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${activeCircle === "erp" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
+                }`}
             >
               <div className="absolute top-10 left-8 text-left">
                 <span className="text-sm sm:text-base font-bold text-[#FA651E] tracking-tight block">
@@ -80,9 +79,8 @@ export function VennSection(): React.ReactElement {
             <div
               onMouseEnter={() => setActiveCircle("news")}
               onMouseLeave={() => setActiveCircle(null)}
-              className={`absolute top-6 right-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${
-                activeCircle === "news" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
-              }`}
+              className={`absolute top-6 right-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${activeCircle === "news" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
+                }`}
             >
               <div className="absolute top-10 right-8 text-right">
                 <span className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight block">
@@ -106,9 +104,8 @@ export function VennSection(): React.ReactElement {
             <div
               onMouseEnter={() => setActiveCircle("sheets")}
               onMouseLeave={() => setActiveCircle(null)}
-              className={`absolute bottom-6 left-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${
-                activeCircle === "sheets" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
-              }`}
+              className={`absolute bottom-6 left-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${activeCircle === "sheets" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
+                }`}
             >
               <div className="absolute bottom-10 left-8 text-left">
                 <span className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight block">
@@ -132,9 +129,8 @@ export function VennSection(): React.ReactElement {
             <div
               onMouseEnter={() => setActiveCircle("ai")}
               onMouseLeave={() => setActiveCircle(null)}
-              className={`absolute bottom-6 right-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${
-                activeCircle === "ai" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
-              }`}
+              className={`absolute bottom-6 right-6 w-[270px] sm:w-[310px] h-[270px] sm:h-[310px] rounded-full border border-neutral-400/80 transition-all duration-300 flex flex-col items-center justify-center p-6 ${activeCircle === "ai" ? "bg-orange-500/10 border-[#FA651E] scale-102" : "bg-neutral-50/20"
+                }`}
             >
               <div className="absolute bottom-10 right-8 text-right">
                 <span className="text-sm sm:text-base font-bold text-[#FA651E] tracking-tight block">
@@ -161,10 +157,6 @@ export function VennSection(): React.ReactElement {
               <div className="mb-1.5 scale-90">
                 <ProvenanceLogo size="sm" inverted={false} />
               </div>
-
-              <span className="text-xs sm:text-[13px] font-extrabold text-neutral-900 leading-tight">
-                Agentic Procurement &amp; Risk Platform
-              </span>
 
               <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FA651E]/10 text-[#FA651E] text-[10px] font-mono font-bold">
                 <span>Unified S2P Core</span>

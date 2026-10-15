@@ -112,10 +112,6 @@ export function FinalCTASection({ onLaunchDemo }: FinalCTASectionProps): React.R
                 </p>
               )}
             </div>
-
-            <p className="text-xs text-neutral-500 font-mono">
-              ✓ Instant 30-day historical backfill · Zero credit card required · 100% deterministic math
-            </p>
           </div>
         </div>
       </div>

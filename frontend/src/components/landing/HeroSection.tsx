@@ -157,11 +157,6 @@ export function HeroSection({ onLaunchDemo }: HeroSectionProps): React.ReactElem
             </p>
           )}
 
-          <div className="mt-2.5 flex items-center justify-center gap-3 text-[11px] font-mono text-neutral-500">
-            <span>• Material Requisition Engine</span>
-            <span>• Delegation of Authority Routing</span>
-            <span>• GLEIF LEI &amp; Sanctions Intersect</span>
-          </div>
         </div>
 
         {/* Social Proof Row */}

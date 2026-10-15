@@ -35,17 +35,11 @@ export function ProvenanceLogo({
           width={width}
           height={height}
           priority
-          className={`h-auto w-auto object-contain transition-opacity duration-200 ${
-            inverted ? "brightness-0 invert" : ""
-          }`}
+          className={`h-auto w-auto object-contain transition-opacity duration-200 ${inverted ? "brightness-0 invert" : ""
+            }`}
           style={{ maxHeight: `${height}px` }}
         />
       </div>
-      {withTagline && (
-        <span className="hidden lg:inline-block text-[10px] font-mono font-semibold tracking-wider uppercase text-neutral-400 pl-2 border-l border-neutral-300/70">
-          Agentic S2P &amp; Risk
-        </span>
-      )}
     </div>
   );
 }
