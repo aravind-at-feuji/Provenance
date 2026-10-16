@@ -118,6 +118,8 @@ def create_app() -> FastAPI:
     # Phase 3 — Order-to-Receipt
     from app.api.v1.purchase_orders import router as purchase_orders_router
     from app.api.v1.goods_receipts import router as goods_receipts_router
+    # Phase 4 — Invoices & 3-Way Matching
+    from app.api.v1.invoices import router as invoices_router
 
     api_prefix = "/v1"
     application.include_router(health_router)
@@ -144,6 +146,8 @@ def create_app() -> FastAPI:
     # Phase 3 routers
     application.include_router(purchase_orders_router, prefix=api_prefix)
     application.include_router(goods_receipts_router, prefix=api_prefix)
+    # Phase 4 routers
+    application.include_router(invoices_router, prefix=api_prefix)
 
     return application
 

@@ -568,3 +568,177 @@ async def tool_record_goods_receipt(
         "delivery_note_ref": grn.delivery_note_ref,
     }
 
+
+# ── Phase 4 Tools: Invoices & 3-Way Matching ──────────────────────────────────
+
+async def tool_process_invoice(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: str | None,
+    po_id: str | None = None,
+    invoice_number: str | None = None,
+    supplier_name: str | None = None,
+    amount: float | None = None,
+    currency: str = "USD",
+    line_items: list[dict[str, Any]] | None = None,
+    notes: str | None = None,
+    auto_match: bool = True,
+) -> dict[str, Any]:
+    """
+    Ingest or create a purchase invoice against a PO and optionally trigger auto-matching.
+    """
+    from app.modules.invoices.schemas import InvoiceCreate, InvoiceLineItemInput
+    from app.modules.invoices.service import InvoiceService
+    from app.modules.spend.models import PurchaseOrder
+
+    # Resolve PO if provided
+    resolved_po_uuid: uuid.UUID | None = None
+    if po_id:
+        try:
+            resolved_po_uuid = uuid.UUID(po_id)
+        except ValueError:
+            stmt = select(PurchaseOrder.id).where(
+                PurchaseOrder.org_id == org_id,
+                PurchaseOrder.po_number.ilike(po_id.strip()),
+                PurchaseOrder.deleted_at.is_(None),
+            )
+            resolved_po_uuid = (await db.execute(stmt)).scalar_one_or_none()
+
+    if not resolved_po_uuid:
+        # Pick latest receivable or active PO
+        stmt = (
+            select(PurchaseOrder.id)
+            .where(
+                PurchaseOrder.org_id == org_id,
+                PurchaseOrder.status.in_(["approved", "sent", "acknowledged", "partially_received", "received"]),
+                PurchaseOrder.deleted_at.is_(None),
+            )
+            .order_by(PurchaseOrder.created_at.desc())
+            .limit(1)
+        )
+        resolved_po_uuid = (await db.execute(stmt)).scalar_one_or_none()
+
+    inv_lines: list[InvoiceLineItemInput] = []
+    if line_items:
+        for idx, it in enumerate(line_items):
+            inv_lines.append(
+                InvoiceLineItemInput(
+                    po_line_index=int(it.get("po_line_index", idx)),
+                    item_id=uuid.UUID(it["item_id"]) if it.get("item_id") else None,
+                    item_code=it.get("item_code"),
+                    description=it.get("description", "Material Supply"),
+                    quantity=float(it.get("quantity", 1.0)),
+                    unit_price=float(it.get("unit_price", 0.0)),
+                    total_amount=float(it["total_amount"]) if it.get("total_amount") is not None else None,
+                    unit_of_measure=it.get("unit_of_measure", "each"),
+                )
+            )
+
+    create_data = InvoiceCreate(
+        po_id=resolved_po_uuid,
+        supplier_name=supplier_name,
+        invoice_number=invoice_number,
+        amount=amount,
+        currency=currency,
+        line_items=inv_lines,
+        notes=notes,
+        auto_match=auto_match,
+    )
+
+    svc = InvoiceService(db)
+    inv = await svc.create_invoice(org_id, create_data, user_id=user_id)
+
+    return {
+        "action": "process_invoice",
+        "invoice_id": str(inv.id),
+        "invoice_number": inv.invoice_number,
+        "supplier_name": inv.supplier_name,
+        "po_number": inv.po_number,
+        "grn_number": inv.grn_number,
+        "amount": inv.amount,
+        "currency": inv.currency,
+        "match_status": inv.match_status,
+        "payment_status": inv.payment_status,
+        "exceptions_count": len(inv.match_exceptions),
+        "items_count": len(inv.line_items),
+        "approved": inv.approved_by is not None,
+    }
+
+
+async def tool_match_invoice(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: str | None = None,
+    invoice_id: str,
+    price_tolerance_pct: float = 2.0,
+    qty_tolerance_pct: float = 5.0,
+    amount_tolerance_abs: float = 500.0,
+) -> dict[str, Any]:
+    """
+    Execute deterministic 2-way or 3-way matching on an invoice.
+    """
+    from app.modules.invoices.matching_engine import MatchTolerances
+    from app.modules.invoices.service import InvoiceNotFound, InvoiceService
+    from app.modules.spend.models import SpendRecord
+
+    target_inv_uuid: uuid.UUID | None = None
+    try:
+        target_inv_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        stmt = select(SpendRecord.id).where(
+            SpendRecord.org_id == org_id,
+            SpendRecord.invoice_number.ilike(invoice_id.strip()),
+            SpendRecord.deleted_at.is_(None),
+        )
+        target_inv_uuid = (await db.execute(stmt)).scalar_one_or_none()
+
+    if not target_inv_uuid:
+        # Check latest invoice
+        stmt = (
+            select(SpendRecord.id)
+            .where(SpendRecord.org_id == org_id, SpendRecord.deleted_at.is_(None))
+            .order_by(SpendRecord.created_at.desc())
+            .limit(1)
+        )
+        target_inv_uuid = (await db.execute(stmt)).scalar_one_or_none()
+
+    if not target_inv_uuid:
+        raise ProcurementToolError(f"Invoice '{invoice_id}' not found.")
+
+    tolerances = MatchTolerances(
+        price_tolerance_pct=price_tolerance_pct,
+        qty_tolerance_pct=qty_tolerance_pct,
+        amount_tolerance_abs=amount_tolerance_abs,
+    )
+
+    svc = InvoiceService(db)
+    try:
+        result = await svc.match_invoice(
+            target_inv_uuid,
+            org_id,
+            user_id=user_id,
+            tolerances=tolerances,
+        )
+    except InvoiceNotFound:
+        raise ProcurementToolError(f"Invoice '{invoice_id}' not found.")
+
+    return {
+        "action": "match_invoice",
+        "invoice_id": str(result.invoice_id),
+        "invoice_number": result.invoice_number,
+        "match_type": result.match_type,
+        "match_status": result.match_status,
+        "po_number": result.po_number,
+        "grn_number": result.grn_number,
+        "supplier_name": result.supplier_name,
+        "within_tolerance": result.within_tolerance,
+        "summary": result.summary,
+        "exceptions_count": len(result.exceptions),
+        "exceptions": [e.model_dump() for e in result.exceptions],
+        "line_matches": [lm.model_dump() for lm in result.line_matches],
+        "tolerances_used": result.tolerances_used,
+    }
+
+

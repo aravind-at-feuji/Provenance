@@ -17,6 +17,7 @@ import {
   Network,
   ArrowUp,
   User,
+  Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +49,11 @@ export interface InvestigationCitation {
   | "document"
   | "material_request"
   | "item"
-  | "approval";
+  | "approval"
+  | "invoice"
+  | "goods_receipt"
+  | "purchase_order"
+  | "rfx";
   title: string;
   details: string;
   country?: string | null;
@@ -180,6 +185,14 @@ const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
     category: "procurement",
     icon: "PackageCheck",
     description: "Inspect and confirm intake delivery on dock",
+  },
+  {
+    id: "sug-8",
+    title: "Run 3-Way Match",
+    prompt: "Run 3-way match for the latest supplier invoice against purchase order and goods receipt",
+    category: "procurement",
+    icon: "Receipt",
+    description: "Verify price and quantity tolerances deterministically",
   },
 ];
 

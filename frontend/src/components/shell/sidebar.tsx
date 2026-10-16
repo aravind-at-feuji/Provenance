@@ -22,6 +22,7 @@ import {
   FileText,
   ShoppingCart,
   PackageCheck,
+  Receipt,
 } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui-store";
 import { useUserStore } from "@/lib/store/user-store";
@@ -118,6 +119,11 @@ export function Sidebar() {
       title: "Purchase Receipt",
       href: "/receipts",
       icon: PackageCheck,
+    },
+    {
+      title: "Purchase Invoice",
+      href: "/invoices",
+      icon: Receipt,
     },
     {
       title: "Approvals",

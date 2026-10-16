@@ -111,8 +111,37 @@ export function DocumentStatusBadge({
     case "active":
       styleClasses = "bg-emerald-50 text-emerald-700 border-emerald-200/80 font-medium";
       break;
-    case "inactive":
-      styleClasses = "bg-neutral-100 text-neutral-500 border-neutral-200";
+    case "matched_3way":
+      styleClasses = "bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold";
+      label = "Matched 3-Way";
+      break;
+    case "matched_2way":
+      styleClasses = "bg-teal-50 text-teal-800 border-teal-300 font-medium";
+      label = "Matched 2-Way";
+      break;
+    case "exception":
+      styleClasses = "bg-rose-50 text-rose-800 border-rose-300 font-bold";
+      label = "Match Exception";
+      break;
+    case "unmatched":
+      styleClasses = "bg-neutral-100 text-neutral-700 border-neutral-300 font-medium";
+      label = "Unmatched";
+      break;
+    case "paid":
+      styleClasses = "bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold";
+      break;
+    case "unpaid":
+      styleClasses = "bg-neutral-100 text-neutral-600 border-neutral-200 font-medium";
+      break;
+    case "partially_paid":
+      styleClasses = "bg-amber-50 text-amber-800 border-amber-300 font-medium";
+      label = "Partially Paid";
+      break;
+    case "overdue":
+      styleClasses = "bg-red-50 text-red-700 border-red-300 font-bold";
+      break;
+    case "disputed":
+      styleClasses = "bg-purple-50 text-purple-700 border-purple-300 font-medium";
       break;
     default:
       styleClasses = "bg-neutral-100 text-neutral-700 border-neutral-200";
